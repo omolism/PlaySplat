@@ -19,20 +19,20 @@
 
 const PILLARS = [
   {
-    tag: "AI Tools",
-    line: "Custom diffusion-based texture stylization · IP-Adapter · ControlNet · AdaIN",
+    tag: "Represent",
+    line: "Splat · Billboard · Voxel, three cross-fading views of one dataset",
   },
   {
-    tag: "3DGS",
-    line: "~3M splats from a Postshot capture, rendered via Spark with OpenUSD subforms",
+    tag: "Interact",
+    line: "MediaPipe hand tracking · 8 per-splat FX · brush and effector modes",
   },
   {
-    tag: "Simulation",
-    line: "Houdini-driven gazebo SIM · VAT-baked daffodil · Unreal WPO vine growth",
+    tag: "Customize",
+    line: "Every FX and post-process parameter exposed · drag in your own .splat / .ply / .spz",
   },
   {
-    tag: "Interaction",
-    line: "MediaPipe hand tracking · GPGPU click FX · live Python · OSC rigs in Unreal",
+    tag: "Interchange",
+    line: "Billboard and voxel layers serialize to OpenUSD straight from the browser",
   },
 ];
 
@@ -74,25 +74,25 @@ export class About {
       </header>
       <div class="ab-body">
         <section class="ab-hero">
-          <div class="ab-eyebrow">Real-Time Visual + Simulation</div>
+          <div class="ab-eyebrow">Interactive 3DGS Playground</div>
           <h2 class="ab-name">PlaySplat</h2>
           <p class="ab-blurb">
-            The project spans four pillars: <strong>AI Tools</strong>,
-            <strong>3DGS</strong>, <strong>Simulation</strong>, and live
-            <strong>Interaction</strong>, all under the theme
-            <em>Real-Time Visual and Simulation</em>. This browser viewer
-            is the web-deployable face of that work. It captures an
-            Unreal Engine garden as a 3D Gaussian Splat, authored with
-            custom AI-stylized textures and dressed with Houdini-driven
-            simulations, then re-renders the scene live with hand-tracking
-            interaction. The same garden is staged on an LED volume for
-            large-screen display; this viewer is the portable counterpart
-            that ships in a browser tab.
+            PlaySplat is a spin-off of
+            <a href="https://splatgarden.com" target="_blank"
+               rel="noopener noreferrer"><strong>SplatGarden</strong></a>,
+            an Unreal-authored garden captured as a three-million-splat
+            3D Gaussian scene. Where SplatGarden presents the finished
+            artwork, PlaySplat opens the toolbox: it leads with
+            <strong>interaction</strong> and <strong>customization</strong>.
+            Cross-fade the scene between splat, billboard, and voxel
+            representations, drive effects with bare-hand tracking, tune
+            every parameter, drop in your own captures, and export the
+            derived layers to OpenUSD, all in a browser tab.
           </p>
         </section>
 
         <section class="ab-pillars-sec">
-          <div class="ab-sec-title">Pipeline</div>
+          <div class="ab-sec-title">What's inside</div>
           <ul class="ab-pillars">
             ${PILLARS.map(p => `
               <li class="ab-pillar">

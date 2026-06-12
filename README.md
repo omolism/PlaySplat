@@ -3,6 +3,11 @@
 A browser-based multi-representation viewer for 3D Gaussian Splatting scenes,
 built on Three.js and [@sparkjsdev/spark](https://github.com/sparkjsdev/spark).
 
+PlaySplat is a spin-off of [SplatGarden](https://splatgarden.com): where
+SplatGarden presents the finished artwork, PlaySplat focuses on interaction
+and customization — every parameter exposed, drag-and-drop scene loading,
+and OpenUSD export for research and tinkering.
+
 A single 3DGS asset is maintained as three co-registered representations that
 cross-fade freely in one WebGL 2 context:
 
