@@ -194,6 +194,14 @@ export class Voxelizer {
       mesh.scale.copy(this.splatMesh.scale);
       mesh.renderOrder = 1;
 
+      // Replace any previous build — without this, debounced size/shape
+      // rebuilds (and interactive-layer retargets) stacked a new mesh on
+      // top of the old one each time.
+      if (this.mesh) {
+        this.scene.remove(this.mesh);
+        this.mesh.geometry.dispose();
+        this.mesh.material.dispose();
+      }
       this.scene.add(mesh);
       this.mesh = mesh;
       this._dirty = false;

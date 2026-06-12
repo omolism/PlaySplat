@@ -591,17 +591,27 @@ const sceneLayers = new SceneLayers({
 // `effects` is hoisted later in this file; the guard tolerates the
 // race where this callback fires before the bridge target is wired.
 sceneLayers.onVisibilityChange = (_id, on, isPrimary) => {
-  if (isPrimary && typeof effects !== "undefined" && effects?.setLayerVis) {
-    effects.setLayerVis("splat", on);
-  }
-  // Retarget effects / raycast / effector-mesh whenever any layer's eye
-  // toggles, so "interactive layer" follows the visible one. Fixes the
-  // bug where importing a second 3DGS and hiding the primary left clicks
-  // silently no-op'ing (raycaster was bound to the now-invisible primary).
+  // Retarget effects / raycast / effector-mesh FIRST, so the FX modifier
+  // and the shader-alpha bridge below both land on the layer that remains
+  // visible. Fixes the bug where importing a second 3DGS and hiding the
+  // primary left clicks silently no-op'ing (raycaster was bound to the
+  // now-invisible primary).
   // Defers through window.__retargetInteractiveLayer because the actual
   // function is defined later (it depends on `splat`, `effects`, `raycaster`,
   // `effectorMesh`, all of which are initialised inside loadSplat below).
   window.__retargetInteractiveLayer?.();
+  // Shader-alpha bridge: zero the splat alpha only when NO splat layer
+  // remains visible. uniforms.splatVis is shared module state applied to
+  // whichever mesh carries the FX modifier — after a retarget that is the
+  // surviving secondary, so forcing alpha 0 on a primary-eye-off (the old
+  // behaviour) faded out the secondary too ("hide garden hides train").
+  if (typeof effects !== "undefined" && effects?.setLayerVis) {
+    const anyVisible = sceneLayers.getVisibleMeshes().length > 0;
+    const splatOn = (typeof effectParams !== "undefined" && effectParams)
+      ? effectParams.splatLayer !== false
+      : true;
+    effects.setLayerVis("splat", anyVisible && splatOn);
+  }
 
   // Hide every scene-anchored overlay when the primary splat is hidden
   // (asset hotspot dots, numbered viewpoint anchors, data labels, COLMAP
@@ -3817,12 +3827,12 @@ async function loadSplat() {
   // hand. Raycast targets are queried fresh per-event from
   // sceneLayers.getVisibleMeshes(), so they don't need a separate hook.
   //
-  // Voxelizer + Quadizer stay bound to the primary even when it's hidden,
-  // because they're "authored representations" of one specific splat — the
-  // voxel/quad cells were baked from the primary's positions and can't
-  // meaningfully follow a different mesh without a full rebuild. If the
-  // user later wants per-layer voxelization, that becomes an explicit
-  // "Re-bake for active layer" action rather than an automatic re-bind.
+  // Voxelizer + Quadizer follow the interactive layer: their cells were
+  // baked from one specific splat's positions, so a retarget re-binds the
+  // source and disposes the stale build. The actual rebuild stays lazy —
+  // the render loop already rebuilds on demand when the layer's vis fades
+  // in and no mesh exists — so the (up to ~2 s) bake cost lands only when
+  // the voxel/billboard layer is actually shown for the new source.
   let _activeInteractive = splat;
   window.__retargetInteractiveLayer = function _retargetInteractiveLayer() {
     const active = sceneLayers.getInteractive()?.mesh || splat;
@@ -3847,6 +3857,19 @@ async function loadSplat() {
     }
     if (effects) effects.mesh = active;
     window.__effects = effects;     // refresh dev pointer
+    // Re-bake the derived representations for the new interactive splat.
+    // Dispose now; the lazy build in the render loop (vis > 0 && !mesh)
+    // re-clusters from the new source on the next fade-in.
+    if (voxelizer && voxelizer.splatMesh !== active) {
+      voxelizer.dispose();
+      voxelizer.splatMesh = active;
+      voxelizer._dirty = true;
+    }
+    if (quadizer && quadizer.splatMesh !== active) {
+      quadizer.dispose();
+      quadizer.splatMesh = active;
+      quadizer._dirty = true;
+    }
     // Reparent the wireframe effector sphere under the new active mesh so
     // its local transform matches uniforms.maskCenter (which is now in the
     // new active mesh's object-space).
