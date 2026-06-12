@@ -14,7 +14,7 @@ if (process.env.CF_PAGES) {
 }
 
 // VITE_BASE — sub-path under which the app is served, e.g.
-// "/SplatGarden/" for GitHub Pages on a project page, or "/"
+// "/PlaySplat/" for GitHub Pages on a project page, or "/"
 // for `npm run dev`. Default is "/" so local dev works without env
 // config. The GitHub Actions workflow sets VITE_BASE to the repo slug
 // before running `npm run build`.

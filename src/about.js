@@ -65,7 +65,7 @@ export class About {
     this.el.id = "about-panel";
     this.el.setAttribute("role", "dialog");
     this.el.setAttribute("aria-modal", "false");
-    this.el.setAttribute("aria-label", "About SplatGarden");
+    this.el.setAttribute("aria-label", "About PlaySplat");
     this.el.setAttribute("hidden", "");
     this.el.innerHTML = `
       <header class="ab-head">
@@ -75,7 +75,7 @@ export class About {
       <div class="ab-body">
         <section class="ab-hero">
           <div class="ab-eyebrow">Real-Time Visual + Simulation</div>
-          <h2 class="ab-name">SplatGarden</h2>
+          <h2 class="ab-name">PlaySplat</h2>
           <p class="ab-blurb">
             The project spans four pillars: <strong>AI Tools</strong>,
             <strong>3DGS</strong>, <strong>Simulation</strong>, and live

@@ -1279,7 +1279,7 @@ body.phone:not(.tablet) #hand-panel { display: none !important; }
  * -------------------------------------------------------------------- */
 #profiler {
   /* Top-centre, just below the About trigger pill. The previous
-     bottom-right slot collided with the SPLATGARDEN STUDIO right rail
+     bottom-right slot collided with the PLAYSPLAT STUDIO right rail
      whenever it was expanded; top-centre is the one region that stays
      clear across every viewport class (left = viewpoints/scene rails,
      right = studio rail, bottom = toolbar / hand panel / mobile pill). */
@@ -2307,7 +2307,7 @@ body.phone:not(.tablet) #hand-panel { display: none !important; }
    camera-move emits "finished". Typography mirrors the LOADING
    SPLASH (.ld-title / .ld-sub / .ld-rule / .ld-desc) so the
    closing card reads as the typographic SIBLING of the opening
-   one. Same hero word "SplatGarden" (mixed case, NOT all-caps),
+   one. Same hero word "PlaySplat" (mixed case, NOT all-caps),
    same -0.025em tight tracking, same 56-px centred hairline,
    same mono mid-caption recipe. No letter-spacing animation, no
    scale-out, no breathing â€” those flourishes felt theatrical and
@@ -2347,7 +2347,7 @@ body.phone:not(.tablet) #hand-panel { display: none !important; }
 }
 
 /* Title â€” same recipe as #loading .ld-title. NOT uppercase.
-   Mixed-case "SplatGarden" with tight negative letter-spacing
+   Mixed-case "PlaySplat" with tight negative letter-spacing
    (the editorial display style the loading splash uses). */
 .cinematic-flourish .cf-title {
   margin: 0;
@@ -2577,7 +2577,7 @@ body.phone:not(.tablet) #hand-panel { display: none !important; }
    annotations' combined horizontal width exceeds the available viewport
    even with the tighter padding above:
        bottom-left  "RUNTIME Â· SPARK Â· THREE.JS Â· WEBGL 2"  â‰ˆ 210 px
-       bottom-right "SCENE Â· SPLATGARDEN"                   â‰ˆ 110 px
+       bottom-right "SCENE Â· PLAYSPLAT"                   â‰ˆ 110 px
        sum 320 > (320 - 48 padding) on iPhone SE â†’ 48 px horizontal overlap.
    The corners are editorial chrome â€” the central title + desc + pillars
    + progress bar already carry the brand identity during the short
@@ -2587,7 +2587,7 @@ body.phone:not(.tablet) #hand-panel { display: none !important; }
   #loading .ld-corner { display: none; }
 }
 
-/* When the Tech Breakdown drawer is open, the SplatGarden Studio panel
+/* When the Tech Breakdown drawer is open, the PlaySplat Studio panel
  * sits at the same right-edge column and overlaps the drawer content.
  * Translate it off-screen so the drawer reads cleanly, with a soft slide
  * matching the drawer's own 0.22s entrance. pointer-events drops to
@@ -2710,7 +2710,7 @@ body.phone .gui-reset-btn:not(.gui-replay-btn) { display: none !important; }
               border-radius 0.22s ease,
               border-bottom-color 0.22s ease;
 }
-/* Collapsed state â€” the SplatGarden Studio panel shrinks to just its
+/* Collapsed state â€” the PlaySplat Studio panel shrinks to just its
    title bar. We treat the closed panel as a SELF-CONTAINED CAPSULE
    PILL rather than a flat slab:
    â€¢ drop the title's bottom-border (no children beneath it now),
@@ -2723,7 +2723,7 @@ body.phone .gui-reset-btn:not(.gui-replay-btn) { display: none !important; }
      capsule feels tappable rather than decorative,
    â€¢ brighten the chevron a touch so the affordance reads at a
      glance against the brighter pill background,
-   â€¢ lengthen letter-spacing slightly so SPLATGARDEN STUDIO breathes
+   â€¢ lengthen letter-spacing slightly so PLAYSPLAT STUDIO breathes
      inside the smaller pill format.
    The base .lil-gui already has `overflow: hidden`, so the rounded
    corners naturally clip whatever children remain underneath. */
@@ -5269,7 +5269,7 @@ body:has(#asset-hover-card.pinned) .lil-gui.root:hover {
   text-shadow: 0 2px 30px rgba(0, 0, 0, 0.75);
 }
 /* Mirrors #loading .ld-title so the splash and the intro overlay show
- * the same "SplatGarden" wordmark in the same face / weight / spacing. */
+ * the same "PlaySplat" wordmark in the same face / weight / spacing. */
 #intro-overlay .io-hero-title {
   font-family: var(--font-ui);
   font-size: clamp(56px, 9vw, 104px);
@@ -8069,7 +8069,7 @@ body:has(#about-panel.show) #mobile-bottombar {
 }
 
 
-/* Poster Mode CSS moved to https://github.com/omolism/SplatGarden-Poster
+/* Poster Mode CSS moved to https://github.com/omolism/PlaySplat-Poster
    (lives entirely in that repo now — was ~510 lines of HUD layout +
     tuner positioning + toggle pill + mode-aware Studio chrome hides). */
 

@@ -648,7 +648,7 @@ export class MobileUI {
         <div class="ms-info-k">Renderer</div>
         <div class="ms-info-v">Spark · Three.js · WebGL 2</div>
         <div class="ms-info-k">Scene</div>
-        <div class="ms-info-v">SplatGarden</div>
+        <div class="ms-info-v">PlaySplat</div>
       </div>
       <button class="ms-action" data-act="pipeline">Open Tech Breakdown</button>
       <button class="ms-action" data-act="guide">Open Quick Guide</button>
@@ -684,7 +684,7 @@ export class MobileUI {
   // ---- Share ----------------------------------------------------------
   async _doShare() {
     const url   = location.href;
-    const title = document.title || "SplatGarden Studio";
+    const title = document.title || "PlaySplat Studio";
     if (navigator.share) {
       try { await navigator.share({ url, title }); return; } catch { /* user cancelled */ }
     }

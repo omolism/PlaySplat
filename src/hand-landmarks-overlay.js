@@ -49,7 +49,7 @@ const BONES = [
 // a stick figure.
 const PALM_FILL = [0, 5, 9, 13, 17];
 
-// Strict monochrome — SplatGarden is a single-hue grayscale design
+// Strict monochrome — PlaySplat is a single-hue grayscale design
 // (see the top-of-file note in style.css). Active / pinch states are
 // expressed via BRIGHTNESS shifts (alpha + glow) rather than hue
 // shifts, so the overlay reads as part of the same UI vocabulary as

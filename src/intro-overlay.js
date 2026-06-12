@@ -16,7 +16,7 @@
 // callout takes over. Times are in clip-normalized [0..1] units. The clip
 // is the middle-400-frame subclip of Shot4B (~16.67 s).
 const HERO = {
-  text:    "SplatGarden",
+  text:    "PlaySplat",
   sub:     "A 3D Gaussian Splatting asset showcase",
   inAt:    0.005,
   holdTo:  0.13,

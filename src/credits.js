@@ -89,7 +89,7 @@ export class Credits {
              at" anywhere — only per-asset detail in the Tech Spec. -->
         <section class="cr-sec cr-about">
           <div class="cr-about-eyebrow">A 3D Gaussian Splatting showcase</div>
-          <h2 class="cr-about-title">SplatGarden</h2>
+          <h2 class="cr-about-title">PlaySplat</h2>
           <div class="cr-about-sub">Studio Showcase</div>
           <div class="cr-about-stack">Houdini &middot; Unreal &middot; COLMAP &middot; Spark</div>
         </section>

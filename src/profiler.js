@@ -16,7 +16,7 @@
 const UPDATE_HZ_MS = 250;     // refresh DOM 4× / sec to read calmly
 const SAMPLE_WINDOW = 30;     // ~0.5s rolling avg @ 60 fps
 
-// Labels named for what they actually do in the SplatGarden render flow,
+// Labels named for what they actually do in the PlaySplat render flow,
 // not for generic engine phases. Frame work order:
 //   JS UPDATE       — controls.update + camera-move tick + effects uniforms
 //   FIELD+PARTICLES — velocity field convolve/advect + GPGPU particle step

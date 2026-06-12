@@ -9,7 +9,7 @@
 //  - USDA is plain text, so no USD runtime is needed in the browser. The
 //    binary crate (.usdc) conversion is done offline with the `usdcat`
 //    tool that ships with Houdini:
-//        usdcat splatgarden-voxel.usda -o splatgarden-voxel.usdc
+//        usdcat playsplat-voxel.usda -o playsplat-voxel.usdc
 //    (lossless, and 4-5x smaller thanks to binary arrays + LZ4).
 //  - Size optimisations baked into the schema mapping:
 //      * orientations[] omitted — voxels are axis-aligned (identity), and
@@ -181,7 +181,7 @@ export function exportLayerUSDA(layer, { voxelizer, quadizer, stride = 1 } = {})
       stride,
       rotate:     { rx: 180, ry: 0, rz: 0 },   // Postshot Y-up flip
     });
-    downloadText(result.usda, "splatgarden-billboard.usda");
+    downloadText(result.usda, "playsplat-billboard.usda");
   } else {
     if (!voxelizer?.mesh) voxelizer?.rebuild?.();
     const mesh = voxelizer?.mesh;
@@ -197,9 +197,9 @@ export function exportLayerUSDA(layer, { voxelizer, quadizer, stride = 1 } = {})
       stride,
       rotate:     { rx: 180, ry: 0, rz: 0 },
     });
-    downloadText(result.usda, "splatgarden-voxel.usda");
+    downloadText(result.usda, "playsplat-voxel.usda");
   }
   console.info(`[usd-export] wrote ${result.exported} instances (stride ${stride}), ${(result.usda.length / 1e6).toFixed(1)} MB of USDA`);
   console.info(`[usd-export] convert to binary crate with Houdini's usdcat:`);
-  console.info(`             usdcat splatgarden-voxel.usda -o splatgarden-voxel.usdc`);
+  console.info(`             usdcat playsplat-voxel.usda -o playsplat-voxel.usdc`);
 }

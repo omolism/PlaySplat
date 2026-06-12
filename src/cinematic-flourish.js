@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // cinematic-flourish.js — end-of-cinematic title card. Fires when the FBX
-// camera-move mixer emits "finished", overlaying a brief "SplatGarden"
+// camera-move mixer emits "finished", overlaying a brief "PlaySplat"
 // signature card so the cinematic feels authored to its conclusion
 // rather than just stopping.
 //
@@ -28,7 +28,7 @@ const TIMING = {
 };
 
 export class CinematicFlourish {
-  constructor({ mountEl = document.body, title = "SplatGarden", subtitle = "Studio Showcase", credit = "Houdini · SpeedTree · Unreal · COLMAP · Spark" } = {}) {
+  constructor({ mountEl = document.body, title = "PlaySplat", subtitle = "Studio Showcase", credit = "Houdini · SpeedTree · Unreal · COLMAP · Spark" } = {}) {
     this.mountEl  = mountEl;
     this.title    = title;
     this.subtitle = subtitle;

@@ -33,7 +33,7 @@ import { MobileUI } from "./mobile-ui.js";
 import { haptic }   from "./haptic.js";
 import { playSound, primeSound } from "./sounds.js";
 // Poster Mode was spun out into its own repo at
-// https://github.com/omolism/SplatGarden-Poster. The src/poster/ folder
+// https://github.com/omolism/PlaySplat-Poster. The src/poster/ folder
 // + public/poster/ assets + the mode-toggle + the dispatch path in the
 // render loop all live there now. This repo is Studio Mode only.
 
@@ -62,10 +62,10 @@ import { loadColmapImages, buildColmapFrustums, colmapCameraPosition, colmapCame
 
 // All public-folder assets resolve against BASE_URL so the same build
 // works at the root (`npm run dev`) and under a sub-path (GitHub Pages
-// — `/SplatGarden/`). BASE_URL always ends with "/" so plain
+// — `/PlaySplat/`). BASE_URL always ends with "/" so plain
 // concatenation is safe.
 const BASE = import.meta.env.BASE_URL;
-const SPLAT_URL = `${BASE}SplatGarden_PC.splat`;
+const SPLAT_URL = `${BASE}PlaySplat_PC.splat`;
 // Mobile variant — same 3 M splats, just re-encoded as SPZ (Niantic's
 // open-sourced compressed format). SPZ typically lands at 30-50% of the
 // uncompressed .splat size with no visible quality loss, so phones over
@@ -78,13 +78,13 @@ const SPLAT_URL = `${BASE}SplatGarden_PC.splat`;
 // HEAD probe in pickSplatUrl() below 404s and the loader gracefully
 // falls back to SPLAT_URL — every device still works, only the mobile
 // bandwidth win goes unrealised. Generate the .spz from the same
-// SplatGarden_PC.splat by running `node scripts/generate-spz-v3.mjs`;
+// PlaySplat_PC.splat by running `node scripts/generate-spz-v3.mjs`;
 // the script uses Spark's own transcodeSpz so the output version
 // matches whatever the shipped runtime can decode (0.1.10 → v3, v2.x →
 // v4). External tools (PlayCanvas SuperSplat, Niantic CLI) also work
 // as long as the SPZ version matches the Spark runtime — see
 // _archive/README.md for the version-mismatch troubleshooting story.
-const SPLAT_MOBILE_URL = `${BASE}SplatGarden_Mobile.spz`;
+const SPLAT_MOBILE_URL = `${BASE}PlaySplat_Mobile.spz`;
 
 // Resolve the splat URL to load. Phones get a HEAD probe on the SPZ
 // variant first; if it 404s we fall back to the full .splat. The probe
@@ -208,7 +208,7 @@ window.__showFatalError = _showFatalError;
   if (!gl) {
     _showFatalError(
       "WebGL 2 not available",
-      "SplatGarden requires WebGL 2 to render 3D Gaussian Splats. " +
+      "PlaySplat requires WebGL 2 to render 3D Gaussian Splats. " +
       "Most current Chrome / Edge / Firefox / Safari versions support it — " +
       "please try a recent browser, or check whether hardware acceleration " +
       "is disabled in your browser settings.",
@@ -342,14 +342,14 @@ function setupCollapsiblePanel({
 const _sidebarCollapseCtrl = setupCollapsiblePanel({
   panelSelector:  "#sidebar",
   toggleSelector: "#sidebar-toggle",
-  storageKey:     "splatgarden:sidebar-collapsed",
+  storageKey:     "playsplat:sidebar-collapsed",
   minimizedClass: "sidebar-minimized",
   bodyClass:      "has-collapsed-sidebar",
 });
 const _handCollapseCtrl = setupCollapsiblePanel({
   panelSelector:  "#hand-panel",
   toggleSelector: "#hand-min-toggle",
-  storageKey:     "splatgarden:hand-collapsed",
+  storageKey:     "playsplat:hand-collapsed",
   minimizedClass: "hand-minimized",
   bodyClass:      "has-collapsed-hand",
 });
@@ -399,7 +399,7 @@ const renderer = new THREE.WebGLRenderer({
 // Pixel-ratio policy. The old cap of `min(dpr, 2)` matched native iPad/Retina
 // pixel density, but the user reported the iPad Air emulator in Chrome
 // DevTools rendered softer than expected — "looks like the mobile asset
-// even though SplatGarden_PC is loaded". Root cause: DevTools' iPad preset
+// even though PlaySplat_PC is loaded". Root cause: DevTools' iPad preset
 // often inherits the HOST monitor's devicePixelRatio (so a 1080p workstation
 // reports dpr=1), and at dpr=1 the 3M-splat scene is rasterised at exactly
 // CSS-pixel resolution with no headroom for the anti-aliasing the projected
@@ -430,7 +430,7 @@ const renderer = new THREE.WebGLRenderer({
 //   balanced  — dpr device-default (1.5 phone / 1.5-floor-3-cap desktop),
 //               bloom OFF, particles OFF  (the current shipped defaults)
 //   max       — dpr 3.0, bloom ON, particles ON  (showcase mode)
-const PERF_PREF_KEY = "splatgarden:perf";
+const PERF_PREF_KEY = "playsplat:perf";
 const PERF_PROFILES = {
   battery:  { dprCap: 1.0,  bloom: false, particles: false },
   balanced: { dprCap: null, bloom: false, particles: false },   // null = device-default
@@ -641,7 +641,7 @@ _hudRefs.sceneLayers = sceneLayers;   // RENDER HUD sums splats across visible l
 _sceneCollapseCtrl = setupCollapsiblePanel({
   panelSelector:  "#scene-panel",
   toggleSelector: "#scene-toggle",
-  storageKey:     "splatgarden:scene-collapsed",
+  storageKey:     "playsplat:scene-collapsed",
   minimizedClass: "sidebar-minimized",   // reuse the same in-place tab idiom
   bodyClass:      "has-collapsed-scene",
 });
@@ -665,7 +665,7 @@ for (const [name, on] of techSpec.assetVisible) {
 }
 techSpec.onAssetToggle = (name, on) => assetHover.setItemVisible(name, on);
 
-// When the Tech Breakdown drawer opens, the lil-gui "SplatGarden Studio"
+// When the Tech Breakdown drawer opens, the lil-gui "PlaySplat Studio"
 // panel on the right-rail occupies the SAME viewport edge and the two
 // overlap visually (drawer is 460px wide, gui is anchored at right:18px).
 // They serve different intents anyway — the drawer is a focused reading
@@ -973,7 +973,7 @@ window.__captureSnapshot = function captureSnapshot() {
     const dataUrl = canvasEl.toDataURL("image/png");
     const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const link = document.createElement("a");
-    link.download = `splatgarden-${ts}.png`;
+    link.download = `playsplat-${ts}.png`;
     link.href = dataUrl;
     // Anchor must be in the DOM for some browsers to honour download.
     document.body.appendChild(link);
@@ -988,10 +988,10 @@ window.__captureSnapshot = function captureSnapshot() {
 
 // Read-only state snapshot for analytics / URL-state serialization /
 // "what was the user looking at when the bug happened" debugging. Accessed
-// via `window.__splatgardenState` in DevTools. Camera pose is the most
+// via `window.__playsplatState` in DevTools. Camera pose is the most
 // useful field — it round-trips into the existing #v=... deep-link
 // format. The getter form means each read returns a FRESH snapshot.
-Object.defineProperty(window, "__splatgardenState", {
+Object.defineProperty(window, "__playsplatState", {
   configurable: true,
   get() {
     return {
@@ -1010,7 +1010,7 @@ Object.defineProperty(window, "__splatgardenState", {
         voxel: effectParams?.voxelLayer,
       },
       perf: (() => {
-        try { return localStorage.getItem("splatgarden:perf") || "balanced"; }
+        try { return localStorage.getItem("playsplat:perf") || "balanced"; }
         catch { return "balanced"; }
       })(),
       timestamp: Date.now(),
@@ -1024,7 +1024,7 @@ Object.defineProperty(window, "__splatgardenState", {
 // to the build root) and uses stale-while-revalidate for heavy assets
 // (splat, SPZ, WebP textures, JS chunks) so the second visit feels
 // instant. The base path comes from import.meta.env.BASE_URL so the
-// register call works in dev (`/`) and on Pages (`/SplatGarden/`).
+// register call works in dev (`/`) and on Pages (`/PlaySplat/`).
 //
 // Skipped on `localhost` over `file://` because some browsers refuse
 // SW registration there, and the dev experience is rebuild-heavy
@@ -1587,7 +1587,7 @@ async function loadSplat() {
   const guiChildren = gui.domElement.querySelector(".children");
   const fUsd = gui.addFolder("3DGS / USD");
   // Move the new folder to be the FIRST child of the root so it sits
-  // at the top of SplatGarden Studio (its showcase position).
+  // at the top of PlaySplat Studio (its showcase position).
   if (guiChildren && fUsd?.domElement) {
     guiChildren.insertBefore(fUsd.domElement, guiChildren.firstChild);
   }
@@ -1623,7 +1623,7 @@ async function loadSplat() {
     // v10 — Right / Back / Left / Top removed from seedDefaults so only
     // Front / Center / Zoom remain. Bump evicts any cached user copies
     // that still had the 7-viewpoint set.
-    storageKey: "splatgarden:viewpoints:v10:" + SPLAT_URL,
+    storageKey: "playsplat:viewpoints:v10:" + SPLAT_URL,
   });
   // Seed defaults silently — without this guard, each seeded add() would
   // write to localStorage and wipe any saved user-added viewpoints (e.g.
@@ -1993,7 +1993,7 @@ async function loadSplat() {
   // Play / Stop because that's the user's mental model for "do the
   // camera-move thing again", not in Tech Spec.
   window.__replayIntro = () => {
-    try { localStorage.removeItem("splatgarden:visited:v1"); } catch {}
+    try { localStorage.removeItem("playsplat:visited:v1"); } catch {}
     window.location.reload();
   };
 
@@ -2632,7 +2632,7 @@ async function loadSplat() {
           // (700 ms fade-in + 1700 ms hold + 700 ms fade-out) so the
           // camera move feels authored to an ending instead of just
           // stopping. play() returns a promise that resolves AFTER
-          // Cinematic flourish ("SplatGarden Studio Showcase" end card)
+          // Cinematic flourish ("PlaySplat Studio Showcase" end card)
           // was retired per user feedback — "intro 播完不用再出现splat
           // garden 的文字介绍了 有点累赘". The opening title sequence
           // (introOverlay) and the loading splash already wordmark the
@@ -3642,7 +3642,7 @@ async function loadSplat() {
   // without a permission prompt). Without (b) we'd silently trigger a
   // permission popup on every page load, which is worse than just asking
   // the user to click the toggle once.
-  const HAND_PREF_KEY = "splatgarden:hand-tracking-on";
+  const HAND_PREF_KEY = "playsplat:hand-tracking-on";
 
   handToggle.addEventListener("click", async () => {
     // Clear stale error UI on retry
@@ -3765,7 +3765,7 @@ async function loadSplat() {
 
       // Hide the primary so the new upload reads as the headline scene.
       // The user clicked "Use My Own" — they want to see their splat,
-      // not the SplatGarden scene with their splat hidden behind it.
+      // not the PlaySplat scene with their splat hidden behind it.
       // The primary stays in `sceneLayers` (just .visible = false), so
       // an eye-toggle in the Scene panel brings it back.
       if (typeof splat !== "undefined" && splat) {
@@ -3775,7 +3775,7 @@ async function loadSplat() {
 
       // Reframe the camera onto the new splat's bounding box. Postshot /
       // Inria exports each have their own coordinate space, so a fresh
-      // upload typically lands well outside the SplatGarden viewing
+      // upload typically lands well outside the PlaySplat viewing
       // volume — without this reframe the user toggles "Use My Own" and
       // sees nothing because the camera is still pointed at the original
       // scene. Mirrors the initial load's reframe logic in loadSplat().
@@ -3984,7 +3984,7 @@ async function loadSplat() {
   // clip finishes (or the user interacts), onboarding pointers fade in to
   // call out the discoverable panels. localStorage flag dedupes so repeat
   // visitors land directly in the interactive scene.
-  const FIRST_VISIT_KEY = "splatgarden:visited:v1";
+  const FIRST_VISIT_KEY = "playsplat:visited:v1";
   const isFirstVisit = (() => {
     try { return !localStorage.getItem(FIRST_VISIT_KEY); } catch { return false; }
   })();
@@ -4051,12 +4051,12 @@ async function loadAdditionalSplatLayers() {
   if (!Array.isArray(list)) return;
 
   // Compare by BASENAME only — manifest entries are bare filenames
-  // ("SplatGarden_PC.splat") but SPLAT_URL is the full path
-  // ("/SplatGarden/SplatGarden_PC.splat" on Pages). The old
+  // ("PlaySplat_PC.splat") but SPLAT_URL is the full path
+  // ("/PlaySplat/PlaySplat_PC.splat" on Pages). The old
   // `replace(/^\//, "")` left the BASE prefix intact, so the filter
   // never matched on production and the primary splat was loaded a
   // second time as a "secondary" — which is what produced the
-  // duplicate `SplatGarden_PC · 3.00M` row in the Scene panel.
+  // duplicate `PlaySplat_PC · 3.00M` row in the Scene panel.
   const primaryFile = SPLAT_URL.split("/").pop();
   const secondaries = list.filter(f => typeof f === "string" && f && f !== primaryFile);
 

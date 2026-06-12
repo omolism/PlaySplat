@@ -140,7 +140,7 @@ export class UsdLayers {
     // who knows their pipeline ships big bboxes doesn't have to retype
     // the cap every visit. Empty value (or NaN after parse) → no cap,
     // auto-detected radius wins.
-    const MAX_RANGE_KEY = "splatgarden:uploadMaxRange";
+    const MAX_RANGE_KEY = "playsplat:uploadMaxRange";
     let savedRange = "";
     try { savedRange = localStorage.getItem(MAX_RANGE_KEY) || ""; } catch {}
 
@@ -200,7 +200,7 @@ export class UsdLayers {
     // so it doesn't reappear next session. Pure UX move: the textual
     // hint is a crutch that should self-retire as soon as the user's
     // own action proves they understood the multi-select.
-    const HINT_KEY = "splatgarden:usd-hint-seen";
+    const HINT_KEY = "playsplat:usd-hint-seen";
     try {
       if (localStorage.getItem(HINT_KEY) === "1" && this.hintEl) {
         this.hintEl.classList.add("dismissed");

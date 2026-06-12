@@ -23,7 +23,7 @@
 // future edit to phase copy / timing happens in lock-step. If you change
 // one, change both.
 const HERO = {
-  text:    "SplatGarden",
+  text:    "PlaySplat",
   sub:     "A 3D Gaussian Splatting asset showcase",
   inAt:    0.005,
   holdTo:  0.13,
@@ -351,7 +351,7 @@ export class IntroRecorder {
     });
   }
 
-  download(blob, baseName = "splatgarden-intro") {
+  download(blob, baseName = "playsplat-intro") {
     if (!blob) return;
     const url = URL.createObjectURL(blob);
     const a   = document.createElement("a");

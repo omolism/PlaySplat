@@ -1234,7 +1234,7 @@ const PRESETS = {
 };
 
 export function buildGUI(controller) {
-  const gui = new GUI({ title: "SplatGarden Studio" });
+  const gui = new GUI({ title: "PlaySplat Studio" });
 
   const presetKeys = Object.keys(PRESETS);
   // Default the FX dropdown to Slime Molds and seed params with its values
@@ -1271,11 +1271,11 @@ export function buildGUI(controller) {
   const PERF_LABEL = "Performance";
   const PERF_OPTIONS = { Battery: "battery", Balanced: "balanced", "Max Quality": "max" };
   let _currentPerf = "balanced";
-  try { _currentPerf = localStorage.getItem("splatgarden:perf") || "balanced"; } catch {}
+  try { _currentPerf = localStorage.getItem("playsplat:perf") || "balanced"; } catch {}
   if (!(_currentPerf in { battery:1, balanced:1, max:1 })) _currentPerf = "balanced";
   const perfObj = { perf: _currentPerf };
   const perfCtrl = gui.add(perfObj, "perf", PERF_OPTIONS).name(PERF_LABEL).onChange(v => {
-    try { localStorage.setItem("splatgarden:perf", v); } catch {}
+    try { localStorage.setItem("playsplat:perf", v); } catch {}
     // Most settings are applied at init from the persisted value — a
     // change at runtime needs a reload to fully re-apply (DPR + bloom +
     // particles default all branch off the profile during boot). Surface

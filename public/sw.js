@@ -1,4 +1,4 @@
-// SplatGarden service worker — runtime-caching PWA.
+// PlaySplat service worker — runtime-caching PWA.
 //
 // Strategy is "stale-while-revalidate for heavy assets, network-first for
 // HTML". The splat / SPZ / textures / HDR sky / JS chunks make up the
@@ -14,10 +14,10 @@
 //
 // IMPORTANT: this file is served from `/public/sw.js` (Vite copies it
 // verbatim to the build root). The scope is the deploy root
-// (`/SplatGarden/` on Pages, `/` in dev), so we register it from
+// (`/PlaySplat/` on Pages, `/` in dev), so we register it from
 // main.js with that base path.
 
-const CACHE_VERSION = "splatgarden-v1";
+const CACHE_VERSION = "playsplat-v1";
 const HTML_TIMEOUT_MS = 3000;
 
 // File patterns that are safe to cache long-term. Vite hashes every
@@ -55,7 +55,7 @@ self.addEventListener("activate", (event) => {
     const keys = await caches.keys();
     await Promise.all(
       keys
-        .filter((k) => k !== CACHE_VERSION && k.startsWith("splatgarden-"))
+        .filter((k) => k !== CACHE_VERSION && k.startsWith("playsplat-"))
         .map((k) => caches.delete(k))
     );
     await self.clients.claim();
