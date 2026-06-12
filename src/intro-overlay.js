@@ -30,7 +30,7 @@ const HERO = {
 const PHASES = [
   { at: 0.02, until: 0.25, eyebrow: "RENDER",    text: "Gaussian splatting rasterized live in WebGL via Spark" },
   { at: 0.27, until: 0.50, eyebrow: "REPRESENT", text: "Splat, billboard, and voxel views of one dataset" },
-  { at: 0.52, until: 0.75, eyebrow: "INTERACT",  text: "Hand tracking and per-splat effects, no install" },
+  { at: 0.52, until: 0.75, eyebrow: "INTERACT",  text: "Every click and pinch drives a real-time simulation" },
   { at: 0.77, until: 0.99, eyebrow: "EXPORT",    text: "Layers serialize to OpenUSD straight from the page" },
 ];
 
