@@ -17,20 +17,21 @@
 // is the middle-400-frame subclip of Shot4B (~16.67 s).
 const HERO = {
   text:    "PlaySplat",
-  sub:     "A 3D Gaussian Splatting asset showcase",
+  sub:     "A multi-representation 3D Gaussian Splatting playground",
   inAt:    0.005,
   holdTo:  0.13,
   outAt:   0.17,
 };
 
 // Lower-third callouts: one per ¼ of the clip. eyebrow names the phase,
-// text describes the step concretely (tool + scale where useful). No
-// decorative separators in the copy — commas only.
+// text describes a viewer capability (the clip itself cycles the subforms,
+// so the copy leads with what the viewer can do rather than how the demo
+// scene was produced). No decorative separators in the copy — commas only.
 const PHASES = [
-  { at: 0.02, until: 0.25, eyebrow: "CAPTURE", text: "Captured in Unreal Engine" },
-  { at: 0.27, until: 0.50, eyebrow: "POSE",    text: "990 camera poses solved with COLMAP" },
-  { at: 0.52, until: 0.75, eyebrow: "TRAIN",   text: "3 million Gaussians optimized in Postshot" },
-  { at: 0.77, until: 0.99, eyebrow: "RENDER",  text: "Real-time WebGL playback via Spark" },
+  { at: 0.02, until: 0.25, eyebrow: "RENDER",    text: "3 million Gaussians live in your browser via Spark" },
+  { at: 0.27, until: 0.50, eyebrow: "REPRESENT", text: "Splat, billboard, and voxel views of one dataset" },
+  { at: 0.52, until: 0.75, eyebrow: "INTERACT",  text: "Hand tracking and per-splat effects, no install" },
+  { at: 0.77, until: 0.99, eyebrow: "EXPORT",    text: "Layers serialize to OpenUSD straight from the page" },
 ];
 
 // Smooth fade window around each boundary, in clip-normalized units.
