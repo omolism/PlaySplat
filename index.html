@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SplatGarden</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <!-- PWA — manifest enables "Add to Home Screen" on phones and Edge /
+         Chrome's install prompt on desktop. theme-color matches the dark
+         splash so the OS chrome blends in. -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="theme-color" content="#000000" />
+
+    <!-- Google Analytics (gtag.js) — anonymous page-view + engagement
+         telemetry only; no PII collected. Loaded async so it doesn't
+         block the splat-loading critical path. -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7YB79WFBLQ"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){ dataLayer.push(arguments); }
+      gtag('js', new Date());
+      gtag('config', 'G-7YB79WFBLQ');
+    </script>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="viewport"></canvas>
+
+      <!-- Editorial loading splash — shown until the first splat finishes
+           loading. #loading-text + the .hidden class are still the JS hooks. -->
+      <div id="loading">
+        <div class="ld-corner ld-tl">
+          <span class="ld-k">EST</span><span class="ld-v">2026</span>
+        </div>
+        <div class="ld-corner ld-tr">
+          <span class="ld-v">SPLATGARDEN&nbsp;STUDIO&nbsp;/&nbsp;WEB</span>
+        </div>
+        <div class="ld-corner ld-bl">
+          <span class="ld-k">RUNTIME</span><span class="ld-v">SPARK&nbsp;·&nbsp;THREE.JS&nbsp;·&nbsp;WEBGL&nbsp;2</span>
+        </div>
+        <div class="ld-corner ld-br">
+          <span class="ld-k">SCENE</span><span class="ld-v">SPLATGARDEN</span>
+        </div>
+
+        <main class="ld-stage">
+          <h1 class="ld-title">SplatGarden</h1>
+          <div class="ld-sub">Studio Showcase</div>
+
+          <div class="ld-rule"></div>
+
+          <p class="ld-desc">
+            A garden, born of <span class="ld-em">Houdini</span> and <span class="ld-em">Unreal</span>.
+          </p>
+          <p class="ld-desc ld-desc-fine">
+            Trained as a 3D Gaussian Splat. Alive in your browser.
+          </p>
+
+          <div class="ld-pillars">
+            <span class="ld-pillar"><span class="ld-pillar-n">01</span> 3DGS</span>
+            <span class="ld-pillar"><span class="ld-pillar-n">02</span> USD</span>
+            <span class="ld-pillar"><span class="ld-pillar-n">03</span> AI</span>
+          </div>
+        </main>
+
+        <footer class="ld-foot">
+          <div class="ld-bar"><div class="ld-fill"></div></div>
+          <div id="loading-text" class="ld-status">Loading splat&hellip;</div>
+        </footer>
+      </div>
+
+      <!-- Sketchfab-style annotation overlay layer -->
+      <div id="annotation-layer"></div>
+
+      <!-- Hand tracking virtual cursors (only visible when hand tracking is on) -->
+      <div id="hand-cursor"></div>
+      <div id="hand-cursor-2"></div>
+
+      <!-- Gesture HUD — small floating pill that surfaces the CURRENT
+           interpreted gesture (ORBIT / ZOOM · PAN / TAP) while a
+           hand-tracking interaction is active. Updated from main.js
+           gesture handlers; hidden by default. Lets users know which
+           action their gesture is producing without having to look at
+           the small webcam preview. -->
+      <div id="hand-gesture-hud" hidden>
+        <span class="hgh-label"></span>
+      </div>
+
+      <!-- Drag-and-drop splat loader (highlights when a file is dragged over) -->
+      <div id="drop-zone">
+        <div class="drop-ring">
+          <div class="drop-title">Drop .splat / .ply / .spz</div>
+          <div class="drop-sub">Add a new splat layer to the scene</div>
+        </div>
+      </div>
+
+      <!-- Hand tracking panel (bottom-left) -->
+      <div id="hand-panel">
+        <header class="hand-head">
+          <button id="hand-min-toggle" class="sidebar-toggle" title="Collapse panel" aria-label="Collapse panel" aria-expanded="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="14 6 8 12 14 18"/>
+            </svg>
+          </button>
+        </header>
+        <button id="hand-toggle" title="Toggle webcam-based hand tracking">
+          <span class="icon">🖐</span>
+          <span class="label">Hand Tracking</span>
+          <span class="state">OFF</span>
+        </button>
+        <div id="hand-mode" hidden>
+          <button data-mode="single" class="active">1-Hand</button>
+          <button data-mode="two">2-Hand</button>
+        </div>
+        <div id="hand-preview-wrap">
+          <video id="hand-video" autoplay playsinline muted></video>
+        </div>
+        <div id="hand-hint">
+          Move palm over the scene to paint the current effect. Lift hand out of frame to release.
+        </div>
+        <div id="hand-error" hidden>
+          <div class="title"></div>
+          <div class="hint"></div>
+          <a class="docs" href="https://support.google.com/chrome/answer/2693767" target="_blank" rel="noopener">How to enable camera in Chrome ↗</a>
+        </div>
+      </div>
+
+      <!-- Top-left stack: Viewpoints sidebar + Scene layers panel -->
+      <div id="left-stack">
+        <aside id="sidebar">
+          <header>
+            <button id="sidebar-toggle" class="sidebar-toggle" title="Collapse panel" aria-label="Collapse panel" aria-expanded="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="14 6 8 12 14 18"/>
+              </svg>
+            </button>
+            <div class="title">Viewpoints</div>
+            <!-- Both header buttons share one visual vocabulary now: icon-only
+                 square pills, equal padding, the same border + hover treatment
+                 as the Scene panel's chevron-toggle. Previously +Add was a
+                 text-pill and Share was an icon-square — the asymmetry read
+                 as unfinished. Tooltips carry the labels for discoverability. -->
+            <button id="share-viewpoint" class="vp-header-btn" title="Copy a link to the current viewpoint" aria-label="Copy link to this viewpoint">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="18" cy="5"  r="3"/>
+                <circle cx="6"  cy="12" r="3"/>
+                <circle cx="18" cy="19" r="3"/>
+                <line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/>
+                <line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/>
+              </svg>
+            </button>
+            <button id="add-viewpoint" class="vp-header-btn" title="Add a new viewpoint at the current camera pose" aria-label="Add new viewpoint">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="12" y1="5"  x2="12" y2="19"/>
+                <line x1="5"  y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+          </header>
+          <ol id="viewpoint-list"></ol>
+          <div class="hint">
+            <div class="hint-row"><span class="hint-key">⌨</span>
+              <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &middot;
+              <kbd>Q</kbd><kbd>E</kbd> down/up &middot; <kbd>⇧</kbd> boost
+            </div>
+            <div class="hint-row"><span class="hint-key">⌨</span>
+              <kbd>1</kbd>&ndash;<kbd>9</kbd> viewpoint &middot;
+              <kbd>V</kbd> add &middot; <kbd>R</kbd> reset
+            </div>
+            <div class="hint-row"><span class="hint-key">🖱</span>
+              drag rotate &middot; scroll zoom &middot; right-drag pan
+            </div>
+            <!-- Hand-tracking gestures used to live here; they were noise
+                 for users who never enable hand tracking. We now surface
+                 the gesture cheatsheet only when Hand Tracking is toggled
+                 ON, as a transient onboarding toast in the upper viewport
+                 (see main.js → showHandTrackingTip). -->
+
+          </div>
+        </aside>
+        <!-- Scene layers panel mounts here at runtime (src/scene-layers.js) -->
+      </div>
+
+      <!-- Bottom toolbar -->
+      <footer id="toolbar">
+        <!-- "Credits" pill — opens the Credits panel (team / thanks /
+             software / hardware footer). The project-narrative "About this
+             project" surface is reached via the prominent top-centre
+             trigger now, so the bottom pill is dedicated to attribution
+             only. Click handler still lives in main.js under the
+             #about-btn id so the wiring doesn't need a rename. -->
+        <button id="about-btn" class="brand" type="button"
+                title="Credits · team, software, hardware acknowledgements"
+                aria-label="Credits">
+          SplatGarden <span class="brand-about-mark">·</span> <span class="brand-about-label">Credits</span>
+        </button>
+        <div id="status">--</div>
+      </footer>
+    </div>
+
+    <!-- Vimeo Player API — used by src/vimeo-fit.js to detect each
+         embedded clip's actual aspect ratio at runtime and resize
+         its iframe container to match, eliminating Vimeo's internal
+         letterbox bars universally (no per-video config needed). -->
+    <script src="https://player.vimeo.com/api/player.js" async></script>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

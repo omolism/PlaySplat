@@ -1,0 +1,11 @@
+{
+  "name": "SplatGarden",
+  "short_name": "SplatGarden",
+  "description": "A Houdini × Unreal garden, captured as a 3D Gaussian Splat, alive in your browser.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "any"
+}
