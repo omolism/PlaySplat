@@ -11,16 +11,9 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <meta name="theme-color" content="#000000" />
 
-    <!-- Google Analytics (gtag.js) — anonymous page-view + engagement
-         telemetry only; no PII collected. Loaded async so it doesn't
-         block the splat-loading critical path. -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7YB79WFBLQ"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){ dataLayer.push(arguments); }
-      gtag('js', new Date());
-      gtag('config', 'G-7YB79WFBLQ');
-    </script>
+    <!-- Analytics intentionally absent — PlaySplat is a local-first
+         playground; the upstream SplatGarden GA property must not
+         receive traffic from this fork. -->
   </head>
   <body>
     <div id="app">
@@ -44,21 +37,21 @@
 
         <main class="ld-stage">
           <h1 class="ld-title">PlaySplat</h1>
-          <div class="ld-sub">Studio Showcase</div>
+          <div class="ld-sub">Interactive Playground</div>
 
           <div class="ld-rule"></div>
 
           <p class="ld-desc">
-            A garden, born of <span class="ld-em">Houdini</span> and <span class="ld-em">Unreal</span>.
+            One scene, three forms: <span class="ld-em">splat</span> · <span class="ld-em">billboard</span> · <span class="ld-em">voxel</span>.
           </p>
           <p class="ld-desc ld-desc-fine">
-            Trained as a 3D Gaussian Splat. Alive in your browser.
+            Grab it with bare hands. Remix every parameter. Export to USD.
           </p>
 
           <div class="ld-pillars">
             <span class="ld-pillar"><span class="ld-pillar-n">01</span> 3DGS</span>
             <span class="ld-pillar"><span class="ld-pillar-n">02</span> USD</span>
-            <span class="ld-pillar"><span class="ld-pillar-n">03</span> AI</span>
+            <span class="ld-pillar"><span class="ld-pillar-n">03</span> HANDS</span>
           </div>
         </main>
 
