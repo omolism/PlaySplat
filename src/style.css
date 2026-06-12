@@ -8286,3 +8286,75 @@ body:has(#about-panel.show) #mobile-bottombar {
     transform: translate(0, 0) scale(1);
   }
 }
+
+/* ============================================================
+   Playbar - progressive-disclosure bar (desktop only)
+   ============================================================
+   The outcome-first layer over the Studio lil-gui: representation
+   toggles + effect chips + Tour + Studio. Monochrome per the
+   project-wide rule; active state is brightness, not hue.
+   Hidden on touch (mobile-ui owns that surface) and under 900px. */
+#playbar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--panel-strong, rgba(12, 12, 12, 0.78));
+  border: 1px solid var(--hair-strong, rgba(255, 255, 255, 0.10));
+  border-radius: var(--radius, 14px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-soft, 0 12px 40px rgba(0, 0, 0, 0.45));
+  font-family: var(--font-ui, system-ui, sans-serif);
+  user-select: none;
+}
+body.touch #playbar { display: none; }
+@media (max-width: 899px) { #playbar { display: none; } }
+/* Stay out of the cinematic frame the same way other chrome does. */
+body.intro-playing #playbar { opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+
+#playbar .pb-group { display: flex; align-items: center; gap: 6px; }
+#playbar .pb-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--hair, rgba(255, 255, 255, 0.06));
+  flex-shrink: 0;
+}
+
+#playbar .pb-btn,
+#playbar .pb-chip {
+  /* UA button padding leaks into flex rows (pitfall #14) - reset hard. */
+  padding: 0 12px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-sm, 9px) - 1px);
+  color: var(--text-mid, rgba(255, 255, 255, 0.62));
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+#playbar .pb-chip { padding: 0 9px; height: 26px; font-size: 11px; }
+#playbar .pb-btn:hover,
+#playbar .pb-chip:hover {
+  background: var(--hover-strong, rgba(255, 255, 255, 0.08));
+  color: var(--text, rgba(255, 255, 255, 0.92));
+}
+#playbar .pb-btn.active,
+#playbar .pb-chip.active {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--hair-strong, rgba(255, 255, 255, 0.10));
+  color: var(--text, rgba(255, 255, 255, 0.92));
+}
+#playbar .pb-layers .pb-btn { font-weight: 600; }
+#playbar .pb-tour { font-weight: 600; }

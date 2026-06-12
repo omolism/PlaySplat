@@ -56,6 +56,7 @@ import { playSound, primeSound } from "./sounds.js";
   document.addEventListener("touchstart",  primeOnce, true);
 }
 import { UsdLayers } from "./usd-layers.js";
+import { Playbar } from "./playbar.js";
 import { UsdAnnotations } from "./usd-annotations.js";
 import { uniforms as effectUniforms } from "./effects.js";
 import { loadColmapImages, buildColmapFrustums, colmapCameraPosition, colmapCameraRotation } from "./colmap-loader.js";
@@ -1608,6 +1609,18 @@ async function loadSplat() {
   });
   if (fUsdChildren) usdLayers.el.classList.add("usd-embedded");
   window.__usdLayers = usdLayers;
+
+  // ---- Playbar (progressive disclosure over the Studio panel) ------------
+  // Desktop-only outcome-first bar: representation switcher + effect chips
+  // + Tour + Studio toggle. On touch the mobile bottom-bar already covers
+  // this role, so the bar is CSS-hidden under body.touch and the gui keeps
+  // its current behaviour there. On desktop the gui starts hidden — the
+  // STUDIO button restores the full expert surface with all state intact.
+  const playbar = new Playbar({ gui, params: effectParams });
+  window.__playbar = playbar;
+  if (!document.body.classList.contains("touch") && window.innerWidth >= 900) {
+    gui.hide();
+  }
   if (gui.fLayers?.hide) gui.fLayers.hide();
 
   // ---- Annotations ----
