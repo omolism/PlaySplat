@@ -69,7 +69,7 @@ export const TECH_SPECS = [
         // view). Static text + commas remain literal so only the
         // numbers animate.
         output:    "≈ <span class=\"ticker\" data-target=\"3000000\" data-format=\"compact\">0</span> splats · <span class=\"ticker\" data-target=\"990\">0</span> capture frames · <span class=\"ticker\" data-target=\"16.67\" data-decimals=\"2\">0</span>s authored flythrough",
-        note:      "An Unreal-authored garden, captured by a multi-camera rig, reconstructed with COLMAP, trained in parallel by Postshot and Lichtfeld Studio, optimized with Houdini GSOP, and rendered in real time via Spark on Three.js + WebGL — the breakdown below walks the pipeline backwards. It starts with the rendering primitive you're looking at right now, then unwinds to the per-asset authoring that produced the captured scene.",
+        note:      "An Unreal-authored garden, captured by a multi-camera rig, reconstructed with COLMAP, trained in parallel by Postshot and Lichtfeld Studio, optimized with Houdini GSOP, and rendered in real time via Spark on Three.js + WebGL. The breakdown below walks the pipeline backwards. It starts with the rendering primitive you're looking at right now, then unwinds to the per-asset authoring that produced the captured scene.",
       },
     ],
   },
@@ -131,7 +131,7 @@ export const TECH_SPECS = [
         ref:       "Postshot training → USD voxel + point-cloud overlay → real-time deployment",
         toolchain: ["Postshot", "USD PointInstancer", "LiDAR Point Cloud", "Spark · web playback"],
         output:    "Real-time 3DGS with USD-deployable structure + atmosphere layers",
-        note:      "The trained splat is the seed for an artistic deployment pipeline. Postshot's cleanup brings a chaotic initial radiance field down to a usable Gaussian field; USD voxelization then composites the cleaned splat with a complementary point-cloud overlay so collision-bearing voxels carry structure while transparent points carry atmospheric scatter. The same dual-layer system originally targeted Unreal Engine 5 — this browser viewer is the web port of the same approach, with the voxel and point-cloud surfaces re-exposed in the 3DGS / USD panel.",
+        note:      "The trained splat is the seed for an artistic deployment pipeline. Postshot's cleanup brings a chaotic initial radiance field down to a usable Gaussian field; USD voxelization then composites the cleaned splat with a complementary point-cloud overlay so collision-bearing voxels carry structure while transparent points carry atmospheric scatter. The same dual-layer system originally targeted Unreal Engine 5; this browser viewer is the web port of the same approach, with the voxel and point-cloud surfaces re-exposed in the 3DGS / USD panel.",
         processCards: [
           {
             eyebrow:     "01 · TRAINING",

@@ -85,7 +85,7 @@ export class About {
             artwork, PlaySplat opens the toolbox: it leads with
             <strong>interaction</strong> and <strong>customization</strong>.
             Cross-fade the scene between splat, billboard, and voxel
-            representations, drive effects with bare-hand tracking, tune
+            representations, drive effects with webcam hand tracking, tune
             every parameter, drop in your own captures, and export the
             derived layers to OpenUSD, all in a browser tab.
           </p>
@@ -109,7 +109,10 @@ export class About {
            may not show everything at once, but the two action buttons
            stay visible without scrolling — they're the only path
            forward from this surface. -->
-      <section class="ab-cta-sec">
+      <!-- TEMPORARILY DELISTED: Tech Spec and Credits are hidden while
+           their PlaySplat-specific content is rewritten. Remove the
+           hidden attribute to restore both CTAs. -->
+      <section class="ab-cta-sec" style="display: none">
         <button class="ab-cta" data-act="open-tech-spec" type="button">
           <span class="ab-cta-label">Read the full Tech Spec</span>
           <span class="ab-cta-arrow" aria-hidden="true">→</span>

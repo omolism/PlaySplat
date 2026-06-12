@@ -1983,6 +1983,10 @@ async function loadSplat() {
       creditsCtrl.updateDisplay();
     }
   };
+  // TEMPORARILY DELISTED — the Tech Spec drawer (and its Credits entry)
+  // are hidden while the PlaySplat-specific breakdown content is being
+  // rewritten. Remove this hide() to restore the folder.
+  fTechSpec.hide();
 
   // Replay Intro — clears the first-visit flag and reloads so the camera
   // move auto-plays again, with the title-sequence overlay, onboarding
