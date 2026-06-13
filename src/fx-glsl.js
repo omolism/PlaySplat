@@ -231,7 +231,7 @@ export const FX_FUNCTIONS = /* glsl */`
   }
 
   // Apply the crest from fxEval().w as a MULTIPLICATIVE tint, matching the
-  // splat dyno's `rgba.rgb *= mix(vec3(1.0), uColor, crest)` semantics.
+  // splat dyno semantics: rgba.rgb *= mix(vec3(1.0), uColor, crest).
   // Critical: when the Color tint checkbox is OFF the dyno sets uColor to
   // WHITE, and multiply-by-white is a no-op. The earlier lerp-toward-color
   // + additive emissive version washed the whole instancer layer white in
