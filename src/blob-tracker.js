@@ -74,6 +74,14 @@ export class BlobTracker {
     // scratch
     this._v = new THREE.Vector3();
     this._cam = new THREE.Vector3();
+
+    // Full interaction history (world-space hit points), independent of the
+    // display FIFO above — this is the data the exported heatmap draws from,
+    // so it can outlive any single tracker box. Capped to keep the export
+    // pass bounded; in an exhibition this is the running record of every
+    // touch the garden received.
+    this.heatPoints = [];
+    this._HEAT_CAP = 5000;
   }
 
   _resize() {
@@ -90,12 +98,16 @@ export class BlobTracker {
     if (!on) { this.blobs.length = 0; this._clear(); }
   }
 
-  // Wipe the accumulated traces — the exhibition "reset the canvas" gesture.
-  clearAll() { this.blobs.length = 0; this._clear(); }
+  // Wipe the accumulated traces AND the heatmap history — the exhibition
+  // "reset the canvas" gesture.
+  clearAll() { this.blobs.length = 0; this.heatPoints.length = 0; this._clear(); }
 
   // Click → drop a tracker at the world-space hit point.
   addBlob(worldPos) {
     if (!this.params.enable || !worldPos) return;
+    // Record into the heatmap history (kept even after the box retires).
+    this.heatPoints.push(worldPos.clone());
+    if (this.heatPoints.length > this._HEAT_CAP) this.heatPoints.shift();
     this._labelSeq = (this._labelSeq % 8) + 1;   // 1..8 → 1/7 .. 8/7
     this.blobs.push({
       world: worldPos.clone(),
@@ -223,6 +235,90 @@ export class BlobTracker {
       ctx.fillStyle = `rgba(255,255,255,${a})`;
       ctx.fillText(labelFor(p.id), x0 + sz - 5, y0 + 5);
     }
+  }
+
+  // Export the accumulated interaction history as a heatmap PNG, projected
+  // through the CURRENT camera so the density sits over the garden the way
+  // the audience saw it. The exported still deliberately steps outside the
+  // monochrome UI rule — as a data keepsake of the show, a warm thermal
+  // ramp (black to red to amber to white) reads density far better than
+  // grayscale would.
+  // @param {object} opts
+  // @param {HTMLCanvasElement} [opts.background] - the WebGL canvas to dim
+  //        behind the heat (must hold a freshly rendered frame).
+  exportHeatmap({ background = null, returnCanvas = false } = {}) {
+    const W = this._w, H = this._h;
+    if (!this.heatPoints.length) { window.__toast?.("No interactions to map yet"); return; }
+
+    // 1) Density accumulation buffer — additive white gaussian splats.
+    const dens = document.createElement("canvas");
+    dens.width = W; dens.height = H;
+    const dc = dens.getContext("2d");
+    dc.fillStyle = "#000"; dc.fillRect(0, 0, W, H);
+    dc.globalCompositeOperation = "lighter";
+    const R = Math.max(40, Math.round(Math.min(W, H) * 0.06));   // splat radius
+    let plotted = 0;
+    for (const wp of this.heatPoints) {
+      const p = this._project(wp);
+      if (!p) continue;
+      plotted++;
+      const g = dc.createRadialGradient(p.x, p.y, 0, p.x, p.y, R);
+      g.addColorStop(0, "rgba(255,255,255,0.30)");
+      g.addColorStop(1, "rgba(255,255,255,0)");
+      dc.fillStyle = g;
+      dc.beginPath(); dc.arc(p.x, p.y, R, 0, Math.PI * 2); dc.fill();
+    }
+
+    // 2) Output canvas — dimmed scene behind, thermal-mapped density over.
+    const out = document.createElement("canvas");
+    out.width = W; out.height = H;
+    const oc = out.getContext("2d");
+    oc.fillStyle = "#000"; oc.fillRect(0, 0, W, H);
+    if (background) {
+      try { oc.drawImage(background, 0, 0, W, H); } catch (e) { /* tainted/empty */ }
+      oc.fillStyle = "rgba(0,0,0,0.55)"; oc.fillRect(0, 0, W, H);   // dim for contrast
+    }
+
+    const dImg = dc.getImageData(0, 0, W, H).data;
+    const oImg = oc.getImageData(0, 0, W, H);
+    const o = oImg.data;
+    // Normalize against the peak density so the ramp uses its full range.
+    let peak = 1;
+    for (let i = 0; i < dImg.length; i += 4) if (dImg[i] > peak) peak = dImg[i];
+    for (let i = 0; i < dImg.length; i += 4) {
+      const t = Math.min(dImg[i] / peak, 1);          // 0..1 density
+      if (t < 0.02) continue;                          // leave cold areas as scene
+      // thermal ramp: black→red→amber→white
+      const r = Math.min(t * 3.0, 1);
+      const g = Math.min(Math.max(t * 3.0 - 1, 0), 1);
+      const b = Math.min(Math.max(t * 3.0 - 2, 0), 1);
+      const a = Math.min(t * 1.6, 0.92);               // heat opacity over scene
+      o[i]   = o[i]   * (1 - a) + r * 255 * a;
+      o[i+1] = o[i+1] * (1 - a) + g * 255 * a;
+      o[i+2] = o[i+2] * (1 - a) + b * 255 * a;
+    }
+    oc.putImageData(oImg, 0, 0);
+
+    // 3) Caption strip — interaction count + timestamp, exhibition record.
+    oc.font = "13px ui-monospace, 'SF Mono', Menlo, monospace";
+    oc.fillStyle = "rgba(255,255,255,0.85)";
+    oc.textBaseline = "bottom";
+    oc.fillText(`PlaySplat  ·  ${plotted} interactions mapped`, 16, H - 14);
+
+    // Caller wants the canvas itself (preview / test) rather than a download.
+    if (returnCanvas) return out;
+
+    // 4) Download.
+    out.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "playsplat-heatmap.png";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }, "image/png");
+    window.__toast?.(`Heatmap exported — ${plotted} interactions`);
   }
 
   dispose() {

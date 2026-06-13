@@ -2092,6 +2092,15 @@ async function loadSplat() {
   fBlob.add(_bp, "glow").name("Glow");
   fBlob.add(_bp, "label").name("Confidence Label");
   fBlob.add({ clear: () => blobTracker.clearAll() }, "clear").name("Clear Traces");
+  fBlob.add({ exportHeat: () => {
+    // Render a fresh frame so the viewport canvas holds the current garden
+    // view, then export the heatmap over it.
+    try {
+      if (typeof postfx !== "undefined" && postfx?.params?.postEnable !== false) postfx.render(0);
+      else renderer.render(scene, camera);
+    } catch (e) { console.warn("[heatmap] pre-render failed:", e); }
+    blobTracker.exportHeatmap({ background: renderer.domElement });
+  } }, "exportHeat").name("⬇ Export Heatmap");
 
   const fOverlay = gui.addFolder("Camera Movement");   // renamed from "Overlays"
   let hdrTex = null;
