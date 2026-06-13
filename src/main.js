@@ -2047,6 +2047,15 @@ async function loadSplat() {
   // Play / Stop because that's the user's mental model for "do the
   // camera-move thing again", not in Tech Spec.
   window.__replayIntro = () => {
+    // Authored scene: clear the first-visit flag and reload so the FBX
+    // cinematic + title overlay auto-play fresh. A generic scene has no
+    // authored cinematic, so "replay" instead plays the procedural orbit
+    // tour around the current scene (a reload would just land back in the
+    // static interactive view, which read as "replay does nothing").
+    if (!SCENE.authored) {
+      window.__tourToggle?.();
+      return;
+    }
     try { localStorage.removeItem("playsplat:visited:v1"); } catch {}
     window.location.reload();
   };
@@ -3962,7 +3971,11 @@ async function loadSplat() {
   // the authored clip at it would frame empty space).
   window.__tourToggle = function _tourToggle() {
     const active = sceneLayers.getInteractive()?.mesh || splat;
-    if (active === splat) {
+    // Authored FBX cinematic ONLY when the bundled authored scene is the
+    // primary AND we're touring it. A generic primary (train, user drop)
+    // has no matching clip — `active === splat` alone would wrongly fire
+    // the garden flythrough on it, so gate on SCENE.authored too.
+    if (SCENE.authored && active === splat) {
       turntable.stop();
       window.__camMovePlayPause?.();
       return;
