@@ -4258,6 +4258,10 @@ renderer.setAnimationLoop(() => {
   // Mirror Playbar button states to live params each frame (cheap dirty
   // check; repaints only on change) so Studio-panel edits reflect instantly.
   window.__playbar?.syncIfDirty?.();
+  // Same for the 3DGS/USD eye panel — its toggles previously only repainted
+  // on its own clicks, so Playbar-driven layer changes left its eye icons
+  // stale. This closes the Playbar <-> USD-panel sync loop.
+  window.__usdLayers?.syncIfDirty?.();
 
   // WASD / QE flythrough
   if (window.__wasdStep) window.__wasdStep(dt);

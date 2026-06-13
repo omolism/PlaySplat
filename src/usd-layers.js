@@ -361,4 +361,19 @@ export class UsdLayers {
   // Allow main.js to push external changes (e.g. lil-gui still drives
   // params elsewhere). Re-renders to keep the panel in sync.
   refresh() { this._render(); }
+
+  // Frame-driven mirror (called from main.js render loop). The eye toggles
+  // and subform pills are pure functions of params, but this panel only
+  // repainted on its OWN clicks — so a change made elsewhere (the Playbar,
+  // the hidden lil-gui controllers, a programmatic toggle) left the eye
+  // icons stale. A cheap signature compare repaints only when a visibility
+  // or shape actually changed; size drags don't touch the signature, so an
+  // in-progress slider isn't interrupted by a re-render.
+  syncIfDirty() {
+    const p = this.params;
+    const sig = ROWS.map(r => `${p[r.visKey] !== false}:${p[r.shapeKey]}`).join("|");
+    if (sig === this._visSig) return;
+    this._visSig = sig;
+    this._render();
+  }
 }
