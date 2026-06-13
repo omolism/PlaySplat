@@ -35,8 +35,6 @@ const EFFECT_CHIPS = {
   Feather: "Feather Roots",
 };
 
-const SYNC_MS = 400;   // state-mirror poll; UI-latency only, not authority
-
 export class Playbar {
   /**
    * @param {object} opts
@@ -129,11 +127,24 @@ export class Playbar {
       this.setStudioOpen(this.gui._hidden === true);
     });
 
-    // Keep button states mirrored when params change from the Studio panel,
-    // the mobile sheet, or programmatic camera-move toggles. Polling beats
-    // monkey-patching every controller's onChange, and 400 ms is invisible
-    // for a state highlight.
-    this._timer = setInterval(() => this._sync(), SYNC_MS);
+    // State mirroring is driven per-frame from the render loop (main.js calls
+    // syncIfDirty()), not a timer: a 400ms poll left a visible lag between a
+    // Studio-panel change and the bar catching up ("the bar doesn't sync").
+    // syncIfDirty() is a cheap string-signature compare that only touches the
+    // DOM when something actually changed, so per-frame cost is negligible.
+    this._lastSig = null;
+    this._sync();
+  }
+
+  // Frame-driven mirror: recompute a compact signature of every state the
+  // bar reflects; only repaint when it differs from last frame.
+  syncIfDirty() {
+    const p = this.params;
+    const sig = `${!!p.splatLayer}|${!!p.quadLayer}|${!!p.voxelLayer}|`
+              + `${p.splatSubform}|${p.quadShape}|${p.voxelShape}|`
+              + `${p.effect}|${this.gui._hidden !== true}`;
+    if (sig === this._lastSig) return;
+    this._lastSig = sig;
     this._sync();
   }
 
@@ -185,7 +196,6 @@ export class Playbar {
   }
 
   dispose() {
-    clearInterval(this._timer);
     this.el.remove();
   }
 }

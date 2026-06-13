@@ -329,8 +329,32 @@ export class AnnotationManager {
     if (this.statusEl) this.statusEl.textContent = msg || "--";
   }
 
+  // Generic bbox-derived viewpoints for non-authored scenes. The garden
+  // presets below are hand-tuned absolute poses around its gazebo; a scene
+  // dragged in (train, or any user .splat) has a totally different origin
+  // and scale, so those poses bury the camera inside the model. These
+  // instead place the camera OUTSIDE the bounding sphere looking at its
+  // center, framing anything automatically.
+  _seedGeneric(c, r) {
+    const presets = [
+      { name: "Front", off: new THREE.Vector3(0,         r * 0.22, r * 1.6) },
+      { name: "Side",  off: new THREE.Vector3(r * 1.5,   r * 0.22, 0) },
+      { name: "Top",   off: new THREE.Vector3(0.01,      r * 1.8,  0.01) },
+    ];
+    let first = null;
+    for (const p of presets) {
+      const position = c.clone().add(p.off);
+      const anchor   = c.clone().add(p.off.clone().multiplyScalar(0.5));
+      const vp = this.addViewpoint({ name: p.name, anchor, position, target: c.clone() });
+      if (!first) first = vp;
+    }
+    if (first) { this.activeId = first.id; this._rebuildList(); }
+    return first;
+  }
+
   // Seed a handful of default viewpoints around the model
-  seedDefaults(boundsCenter, boundsRadius) {
+  seedDefaults(boundsCenter, boundsRadius, opts = {}) {
+    if (opts.generic) return this._seedGeneric(boundsCenter, boundsRadius);
     // SUBJECT is the gazebo — the actual visual centre of the scene, not
     // the splat's geometric centroid (which gets pulled off by outlier
     // splats). The four cardinal cameras + Top all orbit around this.

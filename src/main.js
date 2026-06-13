@@ -67,7 +67,19 @@ import { loadColmapImages, buildColmapFrustums, colmapCameraPosition, colmapCame
 // — `/PlaySplat/`). BASE_URL always ends with "/" so plain
 // concatenation is safe.
 const BASE = import.meta.env.BASE_URL;
-const SPLAT_URL = `${BASE}PlaySplat_PC.splat`;
+// Default landing scene. Switch SCENE to flip the bundled asset. Each entry
+// declares whether it ships the garden-specific authored extras: the COLMAP
+// capture frustums (public/colmap/*.bin) and the hand-authored FBX camera
+// flythrough. A generic dropped-in scene like `train` has neither, so those
+// are guarded off (see `SCENE.authored` below) and the viewer lands directly
+// in the interactive state instead of swooping through coordinates that
+// don't match the scene.
+const SCENES = {
+  train:  { file: "train.splat",        authored: false },
+  garden: { file: "PlaySplat_PC.splat", authored: true  },
+};
+const SCENE = SCENES.train;
+const SPLAT_URL = `${BASE}${SCENE.file}`;
 // Mobile variant — same 3 M splats, just re-encoded as SPZ (Niantic's
 // open-sourced compressed format). SPZ typically lands at 30-50% of the
 // uncompressed .splat size with no visible quality loss, so phones over
@@ -1653,16 +1665,17 @@ async function loadSplat() {
     statusEl,
     // localStorage key scoped to the splat URL so swapping splats doesn't
     // bring along the wrong viewpoints.
-    // v10 — Right / Back / Left / Top removed from seedDefaults so only
-    // Front / Center / Zoom remain. Bump evicts any cached user copies
-    // that still had the 7-viewpoint set.
-    storageKey: "playsplat:viewpoints:v10:" + SPLAT_URL,
+    // v11 — generic (bbox-derived) viewpoints for non-authored scenes; bump
+    // evicts stale cached copies that still held the garden-only poses.
+    storageKey: "playsplat:viewpoints:v11:" + SPLAT_URL,
   });
   // Seed defaults silently — without this guard, each seeded add() would
   // write to localStorage and wipe any saved user-added viewpoints (e.g.
-  // "Gazebo") before we get a chance to read them.
+  // "Gazebo") before we get a chance to read them. Generic scenes (train,
+  // user drops) get bbox-framed viewpoints instead of the garden's
+  // hand-tuned gazebo poses, which would otherwise bury the camera.
   annotations._suspendSave = true;
-  const centerVp = annotations.seedDefaults(center, radius);
+  const centerVp = annotations.seedDefaults(center, radius, { generic: !SCENE.authored });
   annotations._suspendSave = false;
 
   // Asset hotspot click → tween the camera close to the asset. Same Z-flip
@@ -1883,6 +1896,10 @@ async function loadSplat() {
   // Coordinate alignment: the splat mesh is rotated 180° around X to bring
   // Postshot's Y-down convention into Three.js's Y-up. We apply the same
   // mirror to the COLMAP positions so they sit in the same world frame.
+  // Only the authored scene ships a matching COLMAP reconstruction; a
+  // generic scene would either 404 or, worse, display the garden's 990
+  // capture poses floating in unrelated coordinates. Skip it entirely.
+  if (SCENE.authored)
   loadColmapImages(`${BASE}colmap/images.bin`)
     .then(images => {
       // Subsample for a less-cluttered overlay (target ~150 frustums).
@@ -4092,7 +4109,10 @@ async function loadSplat() {
   const _prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   // Also skip the auto-play if a deep-link viewpoint landed us somewhere
   // specific — the user wanted THIS view, not the canned opening.
-  if (isFirstVisit && !_prefersReducedMotion && !window.__deepLinkLanded) {
+  // The cinematic is the garden's hand-authored FBX flythrough — it assumes
+  // that scene's coordinates, so a generic scene (SCENE.authored === false)
+  // skips it and lands directly in the interactive view with the Quick Guide.
+  if (SCENE.authored && isFirstVisit && !_prefersReducedMotion && !window.__deepLinkLanded) {
     try { localStorage.setItem(FIRST_VISIT_KEY, String(Date.now())); } catch {}
     window.__autoPlayedIntro = true;
     introOverlay?.show();
@@ -4221,6 +4241,10 @@ renderer.setAnimationLoop(() => {
 
   // Procedural orbit tour (no-op unless started via __tourToggle)
   turntable.update(dt);
+
+  // Mirror Playbar button states to live params each frame (cheap dirty
+  // check; repaints only on change) so Studio-panel edits reflect instantly.
+  window.__playbar?.syncIfDirty?.();
 
   // WASD / QE flythrough
   if (window.__wasdStep) window.__wasdStep(dt);
