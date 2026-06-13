@@ -78,7 +78,7 @@ const SCENES = {
   train:  { file: "train.splat",        authored: false },
   garden: { file: "PlaySplat_PC.splat", authored: true  },
 };
-const SCENE = SCENES.train;
+const SCENE = SCENES.garden;
 const SPLAT_URL = `${BASE}${SCENE.file}`;
 // Mobile variant — same 3 M splats, just re-encoded as SPZ (Niantic's
 // open-sourced compressed format). SPZ typically lands at 30-50% of the
@@ -2882,28 +2882,11 @@ async function loadSplat() {
   fCamTune.add(camMoveXf, "oz",    -30, 30, 0.1).name("Offset Z").onChange(applyCamFbxXf);
   fCamTune.add(camMoveXf, "scale", 0.05, 3.0, 0.05).name("Scale").onChange(applyCamFbxXf);
 
-  // ---- Orbit Tour — procedural bbox orbit, works on ANY scene -------------
-  // The authored FBX flythrough only fits the bundled scene; this is the
-  // open, parameterized tour for everything else (and a quick auto-orbit
-  // for the bundled scene too). All sliders are read live by turntable.js,
-  // so dragging one reshapes the orbit while it's playing. Distances are
-  // multiples of the scene's bounding radius, so the defaults frame any
-  // dropped-in splat.
-  const fOrbit = fOverlay.addFolder("Orbit Tour");
-  const _op = turntable.orbit;
-  fOrbit.add({ play: () => {
-    const layer = sceneLayers.getInteractive()?.mesh || splat;
-    const b = layer?.userData?.bounds;
-    if (!b) { window.__toast?.("No bounds available for this layer"); return; }
-    window.__camMoveStop?.();
-    const on = turntable.toggleOrbit(b.center, b.radius);
-    window.__toast?.(on ? "Orbit tour — drag to take over" : "Orbit stopped");
-  } }, "play").name("▶ Play / Stop Orbit");
-  fOrbit.add(_op, "turnSeconds", 8, 120, 1).name("Seconds / Turn");
-  fOrbit.add(_op, "radiusScale", 0.5, 4.0, 0.05).name("Distance ×R");
-  fOrbit.add(_op, "heightScale", -1.0, 2.0, 0.05).name("Height ×R");
-  fOrbit.add(_op, "lookHeight",  -1.0, 1.0, 0.02).name("Look Height ×R");
-  fOrbit.add(_op, "direction", { Clockwise: 1, "Counter-CW": -1 }).name("Direction");
+  // (The parameterized "Orbit Tour" folder was removed — camera movement is
+  // back to the authored SplatGarden FBX flythrough. The Turntable orbit
+  // still exists under the hood as the zero-config fallback for dropped-in
+  // scenes that have no authored clip, but it is no longer exposed as a
+  // tunable Studio surface.)
 
   // Per-frame sync: copy the animated FBX node's world transform to the scene
   // camera. When PAUSED the mixer's deltaTime is 0 so the camera holds still
