@@ -3153,6 +3153,13 @@ async function loadSplat() {
     }
   }
 
+  // Particle-trail gate: the additive GPGPU trail sprites are styled for
+  // the soft splat look. When the splat layer is toggled off and the hard
+  // billboard / voxel representations carry the view, the white streaks
+  // read as a stray overlay (user feedback), so velocity-field injection
+  // is suppressed in that state — clicks still drive the per-layer FX.
+  const trailsAllowed = () => effectParams.splatLayer !== false;
+
   canvas.addEventListener("pointerdown", (e) => {
     downPos = { x: e.clientX, y: e.clientY };
     if (brushParams.brush) {
@@ -3163,7 +3170,7 @@ async function loadSplat() {
     // Inject mass + velocity into the global velocity field at the cursor.
     // Velocity vector is zero on press (no cursor delta yet); subsequent
     // moves push velocity proportional to delta — handled in pointermove.
-    if (velocityField) {
+    if (velocityField && trailsAllowed()) {
       const rect = canvas.getBoundingClientRect();
       velocityField.inject(
         (e.clientX - rect.left) / rect.width,
@@ -3178,7 +3185,7 @@ async function loadSplat() {
   // ~30 Hz to keep the inject pass cost negligible.
   let _vfMoveMs = 0, _vfPrevX = -1, _vfPrevY = -1;
   canvas.addEventListener("pointermove", (e) => {
-    if (!velocityField) return;
+    if (!velocityField || !trailsAllowed()) return;
     const now = performance.now();
     if (now - _vfMoveMs < 33) return;
     _vfMoveMs = now;
@@ -3547,7 +3554,7 @@ async function loadSplat() {
     // Pinch start also seeds the velocity field with a fresh impulse — same
     // pattern as mouse press. Subsequent pinch-moves push velocity (handled
     // in updateOnePinch).
-    if (velocityField) velocityField.inject(ux, uy, 0, 0, 1.5, 0.07);
+    if (velocityField && trailsAllowed()) velocityField.inject(ux, uy, 0, 0, 1.5, 0.07);
     // Initial label — flips to ORBIT once the user crosses the
     // drag-threshold (handled inline in updateOnePinch).
     setGestureHud("PINCH");
@@ -3560,7 +3567,7 @@ async function loadSplat() {
     // Pinch-drag stirs the velocity field — same pattern as mouse-move,
     // velocity proportional to per-frame delta. Throttled implicitly by
     // HandController's input rate; cheap enough to call every event.
-    if (velocityField) {
+    if (velocityField && trailsAllowed()) {
       const ux = p.x / window.innerWidth;
       const uy = 1.0 - p.y / window.innerHeight;
       const ox = onePinchPrev.x / window.innerWidth;
