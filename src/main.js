@@ -58,6 +58,7 @@ import { playSound, primeSound } from "./sounds.js";
 import { UsdLayers } from "./usd-layers.js";
 import { Playbar } from "./playbar.js";
 import { Turntable } from "./turntable.js";
+import { BlobTracker } from "./blob-tracker.js";
 import { UsdAnnotations } from "./usd-annotations.js";
 import { uniforms as effectUniforms } from "./effects.js";
 import { loadColmapImages, buildColmapFrustums, colmapCameraPosition, colmapCameraRotation } from "./colmap-loader.js";
@@ -542,6 +543,9 @@ controls.maxDistance = 200;
 // the zero-config fallback that frames anything the user drags in.
 const turntable = new Turntable({ camera, controls });
 window.__turntable = turntable;
+// CV-style 3D tracking-box HUD; a click drops a tracker on the hit point.
+const blobTracker = new BlobTracker({ camera });
+window.__blobTracker = blobTracker;
 // Grabbing the orbit cancels the tour, mirroring the camera move's lockout.
 canvas.addEventListener("pointerdown", () => turntable.stop(), { capture: true });
 
@@ -2072,6 +2076,18 @@ async function loadSplat() {
   // Folder mirrors the Post-Process shape: an Enable checkbox, a Rotation
   // slider (0-360°, mapped to scene.backgroundRotation.y and
   // scene.environmentRotation.y), and the "Use My Own HDRI" button.
+  // ---- Blob Tracker — CV-style 3D tracking-box HUD on click --------------
+  const fBlob = gui.addFolder("Blob Tracker").close();
+  const _bp = blobTracker.params;
+  fBlob.add(_bp, "enable").name("Enable");
+  fBlob.add(_bp, "boxSize",  40, 320, 1).name("Box Size");
+  fBlob.add(_bp, "lifetime", 0.5, 8, 0.1).name("Lifetime (s)");
+  fBlob.add(_bp, "maxBlobs", 1, 32, 1).name("Max Trackers");
+  fBlob.add(_bp, "connections").name("Connectors");
+  fBlob.add(_bp, "scanlines").name("Scanlines");
+  fBlob.add(_bp, "glow").name("Glow");
+  fBlob.add(_bp, "label").name("Confidence Label");
+
   const fOverlay = gui.addFolder("Camera Movement");   // renamed from "Overlays"
   let hdrTex = null;
   let hdrLoading = false;
@@ -3275,6 +3291,7 @@ async function loadSplat() {
     // Otherwise → trigger scan effect at hit point (in object space)
     effects.triggerAt(r.local);
     autoEnableEchoForClick();
+    blobTracker.addBlob(r.hit.point);   // drop a 3D tracking box at the hit
     statusEl.textContent = `Hit (${r.hit.point.x.toFixed(2)}, ${r.hit.point.y.toFixed(2)}, ${r.hit.point.z.toFixed(2)})`;
   });
 
@@ -4266,6 +4283,10 @@ renderer.setAnimationLoop(() => {
 
   // Procedural orbit tour (no-op unless started via __tourToggle)
   turntable.update(dt);
+
+  // Blob tracker HUD — re-projects + redraws the tracking boxes each frame
+  // so they stay locked to their 3D hit points as the camera moves.
+  blobTracker.update(dt);
 
   // Mirror Playbar button states to live params each frame (cheap dirty
   // check; repaints only on change) so Studio-panel edits reflect instantly.
