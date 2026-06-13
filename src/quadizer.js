@@ -24,10 +24,12 @@ const QUAD_VERT = /* glsl */`
   void main() {
     // Click FX: displace and tint each billboard with the same hit/time/
     // effect state that drives the splat layer. The hit point is in the
-    // splat's object space, shared by the billboard centers, so fxOffset
-    // applies directly to aInstanceCenter before the camera-facing build.
-    vec3 c           = aInstanceCenter + fxOffset(aInstanceCenter);
-    vColor           = fxColorTint(aInstanceColor, aInstanceCenter);
+    // splat's object space, shared by the billboard centers. fxEval
+    // returns displacement (xyz) + tint crest (w) in ONE pass so the
+    // noise field is only sampled once per vertex.
+    vec4 fx          = fxEval(aInstanceCenter);
+    vec3 c           = aInstanceCenter + fx.xyz;
+    vColor           = fxTintApply(aInstanceColor, fx.w);
     // PlaneGeometry's position is centered at origin with extents -0.5..0.5,
     // so position.xy doubles as a centered local UV in the [-0.5, 0.5] range
     // — exactly what the circle discard test needs.
@@ -85,6 +87,8 @@ export class Quadizer {
       uEffectStrength: { value: 0 },
       uWindDir:        { value: new THREE.Vector3() },
       uEmissive:       { value: 2.0 },
+      uNoiseScale:     { value: 1.0 },
+      uFlyMax:         { value: 2.0 },
     };
   }
 
@@ -125,6 +129,8 @@ export class Quadizer {
     f.uDuration.value       = u.duration?.value ?? 2.5;
     f.uEffectStrength.value = u.effectStrength?.value ?? 0;
     f.uEmissive.value       = u.emissive?.value ?? 2.0;
+    f.uNoiseScale.value     = u.noiseScale?.value ?? 1.0;
+    f.uFlyMax.value         = u.flyMax?.value ?? 2.0;
     if (u.hit?.value)     f.uHit.value.copy(u.hit.value);
     if (u.color?.value)   f.uColor.value.copy(u.color.value);
     if (u.windDir?.value) f.uWindDir.value.copy(u.windDir.value);

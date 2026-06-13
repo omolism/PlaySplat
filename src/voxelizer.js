@@ -33,10 +33,11 @@ const VOXEL_VERT = /* glsl */`
     // displaces and tints each cube via the shared fx-glsl approximation.
     // The hit point lives in the splat's object space, which the voxel
     // grid shares by construction, so no re-projection is needed.
-    vec3 c        = aInstanceCenter;
-    vec3 fxOff    = fxOffset(c);
-    vec3 worldPos = c + fxOff + position * (uVoxelSize * 0.96);
-    vColor       = fxColorTint(aInstanceColor, c);
+    // fxEval returns displacement (xyz) + tint crest (w) in ONE pass so
+    // the noise field is only sampled once per vertex.
+    vec4 fx       = fxEval(aInstanceCenter);
+    vec3 worldPos = aInstanceCenter + fx.xyz + position * (uVoxelSize * 0.96);
+    vColor       = fxTintApply(aInstanceColor, fx.w);
     gl_Position  = projectionMatrix * modelViewMatrix * vec4(worldPos, 1.0);
   }
 `;
@@ -76,6 +77,8 @@ export class Voxelizer {
       uEffectStrength: { value: 0 },
       uWindDir:        { value: new THREE.Vector3() },
       uEmissive:       { value: 2.0 },
+      uNoiseScale:     { value: 1.0 },
+      uFlyMax:         { value: 2.0 },
     };
   }
 
@@ -126,6 +129,8 @@ export class Voxelizer {
     f.uDuration.value       = u.duration?.value ?? 2.5;
     f.uEffectStrength.value = u.effectStrength?.value ?? 0;
     f.uEmissive.value       = u.emissive?.value ?? 2.0;
+    f.uNoiseScale.value     = u.noiseScale?.value ?? 1.0;
+    f.uFlyMax.value         = u.flyMax?.value ?? 2.0;
     if (u.hit?.value)     f.uHit.value.copy(u.hit.value);
     if (u.color?.value)   f.uColor.value.copy(u.color.value);
     if (u.windDir?.value) f.uWindDir.value.copy(u.windDir.value);
