@@ -22,7 +22,7 @@ export const uniforms = {
   time:        dyno.dynoFloat(0.0),
   hit:         dyno.dynoVec3(new THREE.Vector3(0, 0, 1e6)),
   color:       dyno.dynoVec3(new THREE.Vector3(0.8, 0.8, 0.8)),
-  radius:      dyno.dynoFloat(2.0),
+  radius:      dyno.dynoFloat(1.75),
   speed:       dyno.dynoFloat(4.0),
   intensity:   dyno.dynoFloat(0.6),
   effect:      dyno.dynoInt(0),
@@ -87,7 +87,7 @@ export const params = {
   // who wants colored Scan Line FX gets one tap to opt in.
   colorOn: false,
   color: "#cccccc",
-  radius: 2.0,
+  radius: 1.75,
   speed: 4.0,
   intensity: 0.6,
   duration: 2.5,
@@ -1245,6 +1245,11 @@ export function buildGUI(controller) {
   const presetObj = { preset: DEFAULT_PRESET };
   if (PRESETS[DEFAULT_PRESET]) {
     Object.assign(params, PRESETS[DEFAULT_PRESET]);
+    // Startup interaction radius default — overrides whatever the seed
+    // preset declares so the click/pinch reach lands at a consistent 1.75
+    // on first load. (Switching presets afterward still applies each
+    // preset's own radius.)
+    params.radius = 1.75;
     controller.applyParams();
   }
 
