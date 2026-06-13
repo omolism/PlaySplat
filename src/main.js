@@ -2090,17 +2090,24 @@ async function loadSplat() {
   fBlob.add(_bp, "connections").name("Connectors");
   fBlob.add(_bp, "scanlines").name("Scanlines");
   fBlob.add(_bp, "glow").name("Glow");
-  fBlob.add(_bp, "label").name("Confidence Label");
+  fBlob.add(_bp, "label").name("Show Label");
+  fBlob.add(_bp, "labelMode", {
+    "Track ID": "id", "Timestamp": "time", "Age": "age",
+    "Coordinates": "coords", "Confidence": "confidence",
+  }).name("Label Shows");
   fBlob.add({ clear: () => blobTracker.clearAll() }, "clear").name("Clear Traces");
-  fBlob.add({ exportHeat: () => {
-    // Render a fresh frame so the viewport canvas holds the current garden
-    // view, then export the heatmap over it.
+  // Render a fresh frame so the viewport canvas holds the current garden view,
+  // then export over it (shared by both the PNG and HTML exporters).
+  const _prerenderForExport = () => {
     try {
       if (typeof postfx !== "undefined" && postfx?.params?.postEnable !== false) postfx.render(0);
       else renderer.render(scene, camera);
-    } catch (e) { console.warn("[heatmap] pre-render failed:", e); }
-    blobTracker.exportHeatmap({ background: renderer.domElement });
-  } }, "exportHeat").name("⬇ Export Heatmap");
+    } catch (e) { console.warn("[export] pre-render failed:", e); }
+  };
+  fBlob.add({ exportHeat: () => { _prerenderForExport(); blobTracker.exportHeatmap({ background: renderer.domElement }); } },
+    "exportHeat").name("⬇ Export Field (PNG)");
+  fBlob.add({ exportHtml: () => { _prerenderForExport(); blobTracker.exportHeatmapHTML({ background: renderer.domElement }); } },
+    "exportHtml").name("⬇ Export Trajectory (HTML)");
   fBlob.add({ exportCsv: () => blobTracker.exportCSV() }, "exportCsv").name("⬇ Export Data (CSV)");
 
   const fOverlay = gui.addFolder("Camera Movement");   // renamed from "Overlays"
