@@ -82,6 +82,8 @@ export class BlobTracker {
     // touch the garden received.
     this.heatPoints = [];
     this._HEAT_CAP = 5000;
+    // Structured interaction log (timestamp + coords + context) for CSV.
+    this.log = [];
   }
 
   _resize() {
@@ -100,15 +102,29 @@ export class BlobTracker {
 
   // Wipe the accumulated traces AND the heatmap history — the exhibition
   // "reset the canvas" gesture.
-  clearAll() { this.blobs.length = 0; this.heatPoints.length = 0; this._clear(); }
+  clearAll() { this.blobs.length = 0; this.heatPoints.length = 0; this.log.length = 0; this._clear(); }
 
-  // Click → drop a tracker at the world-space hit point.
-  addBlob(worldPos) {
+  // Click → drop a tracker at the world-space hit point. `meta` carries the
+  // interaction context (active effect + which representations were visible)
+  // so the exported CSV is a real session log, not just coordinates.
+  addBlob(worldPos, meta = {}) {
     if (!this.params.enable || !worldPos) return;
     // Record into the heatmap history (kept even after the box retires).
     this.heatPoints.push(worldPos.clone());
     if (this.heatPoints.length > this._HEAT_CAP) this.heatPoints.shift();
     this._labelSeq = (this._labelSeq % 8) + 1;   // 1..8 → 1/7 .. 8/7
+    // Structured interaction record for the CSV export (independent of the
+    // display FIFO; capped with the heat history).
+    this.log.push({
+      t:      this._elapsed,
+      x:      worldPos.x, y: worldPos.y, z: worldPos.z,
+      effect: meta.effect ?? "",
+      splat:  meta.splat ? 1 : 0,
+      quad:   meta.quad  ? 1 : 0,
+      voxel:  meta.voxel ? 1 : 0,
+      label:  labelFor(this._labelSeq),
+    });
+    if (this.log.length > this._HEAT_CAP) this.log.shift();
     this.blobs.push({
       world: worldPos.clone(),
       t: 0,
@@ -319,6 +335,63 @@ export class BlobTracker {
       setTimeout(() => URL.revokeObjectURL(url), 2000);
     }, "image/png");
     window.__toast?.(`Heatmap exported — ${plotted} interactions`);
+  }
+
+  // Export the interaction session as a CSV for paper support: a summary
+  // header (counts, duration, spatial centroid/extent, per-effect breakdown)
+  // followed by the full per-interaction log with 3D world coordinates and
+  // the representation state at each touch.
+  exportCSV() {
+    const rows = this.log;
+    if (!rows.length) { window.__toast?.("No interactions to export yet"); return; }
+    const n = rows.length;
+    const dur = rows[n - 1].t - rows[0].t;
+
+    // Per-effect tally.
+    const byEffect = {};
+    for (const r of rows) byEffect[r.effect || "(none)"] = (byEffect[r.effect || "(none)"] || 0) + 1;
+
+    // Spatial centroid + axis extent over the world-space hit points.
+    let cx = 0, cy = 0, cz = 0;
+    let xmin = Infinity, ymin = Infinity, zmin = Infinity;
+    let xmax = -Infinity, ymax = -Infinity, zmax = -Infinity;
+    for (const r of rows) {
+      cx += r.x; cy += r.y; cz += r.z;
+      xmin = Math.min(xmin, r.x); xmax = Math.max(xmax, r.x);
+      ymin = Math.min(ymin, r.y); ymax = Math.max(ymax, r.y);
+      zmin = Math.min(zmin, r.z); zmax = Math.max(zmax, r.z);
+    }
+    cx /= n; cy /= n; cz /= n;
+    const f = (v) => Number(v).toFixed(4);
+
+    const lines = [];
+    lines.push(`# PlaySplat interaction session`);
+    lines.push(`# total_interactions,${n}`);
+    lines.push(`# session_duration_s,${dur.toFixed(1)}`);
+    lines.push(`# interactions_per_minute,${dur > 0 ? (n / (dur / 60)).toFixed(1) : "n/a"}`);
+    lines.push(`# centroid_world_xyz,${f(cx)},${f(cy)},${f(cz)}`);
+    lines.push(`# extent_world_xyz,${f(xmax - xmin)},${f(ymax - ymin)},${f(zmax - zmin)}`);
+    lines.push(`# bbox_min_xyz,${f(xmin)},${f(ymin)},${f(zmin)}`);
+    lines.push(`# bbox_max_xyz,${f(xmax)},${f(ymax)},${f(zmax)}`);
+    lines.push(`#`);
+    lines.push(`# per_effect_counts:`);
+    for (const [e, c] of Object.entries(byEffect).sort((a, b) => b[1] - a[1])) {
+      lines.push(`#   ${e},${c},${((c / n) * 100).toFixed(1)}%`);
+    }
+    lines.push(`#`);
+    // Data table — one row per interaction.
+    lines.push(`time_s,world_x,world_y,world_z,effect,splat,billboard,voxel,confidence`);
+    for (const r of rows) {
+      lines.push(`${r.t.toFixed(2)},${f(r.x)},${f(r.y)},${f(r.z)},"${r.effect}",${r.splat},${r.quad},${r.voxel},${r.label}`);
+    }
+
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "playsplat-interactions.csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    window.__toast?.(`Exported ${n} interactions to CSV`);
   }
 
   dispose() {

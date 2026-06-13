@@ -2101,6 +2101,7 @@ async function loadSplat() {
     } catch (e) { console.warn("[heatmap] pre-render failed:", e); }
     blobTracker.exportHeatmap({ background: renderer.domElement });
   } }, "exportHeat").name("⬇ Export Heatmap");
+  fBlob.add({ exportCsv: () => blobTracker.exportCSV() }, "exportCsv").name("⬇ Export Data (CSV)");
 
   const fOverlay = gui.addFolder("Camera Movement");   // renamed from "Overlays"
   let hdrTex = null;
@@ -3305,7 +3306,12 @@ async function loadSplat() {
     // Otherwise → trigger scan effect at hit point (in object space)
     effects.triggerAt(r.local);
     autoEnableEchoForClick();
-    blobTracker.addBlob(r.hit.point);   // drop a 3D tracking box at the hit
+    blobTracker.addBlob(r.hit.point, {  // drop a 3D tracking box + log the interaction
+      effect: effectParams.effect,
+      splat:  effectParams.splatLayer !== false,
+      quad:   effectParams.quadLayer === true,
+      voxel:  effectParams.voxelLayer === true,
+    });
     statusEl.textContent = `Hit (${r.hit.point.x.toFixed(2)}, ${r.hit.point.y.toFixed(2)}, ${r.hit.point.z.toFixed(2)})`;
   });
 
