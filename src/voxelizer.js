@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { FX_UNIFORMS, FX_FUNCTIONS } from "./fx-glsl.js";
 
 // ---------------------------------------------------------------------------
 // Voxelizer — USD-PointInstancer-style cube voxelisation of a SplatMesh.
@@ -25,12 +26,17 @@ const VOXEL_VERT = /* glsl */`
   attribute vec3 aInstanceCenter;
   attribute vec3 aInstanceColor;
   varying vec3 vColor;
+  ${FX_UNIFORMS}
+  ${FX_FUNCTIONS}
   void main() {
-    // Voxel cubes are intentionally static — they don't react to the splat's
-    // click FX. (To re-enable, restore fxOffset/fxColorTint here and the
-    // shader-uniform sync in syncFxUniforms below — see src/fx-glsl.js.)
-    vec3 worldPos = aInstanceCenter + position * (uVoxelSize * 0.96);
-    vColor       = aInstanceColor;
+    // Click FX: the same hit/time/effect state that drives the splat dyno
+    // displaces and tints each cube via the shared fx-glsl approximation.
+    // The hit point lives in the splat's object space, which the voxel
+    // grid shares by construction, so no re-projection is needed.
+    vec3 c        = aInstanceCenter;
+    vec3 fxOff    = fxOffset(c);
+    vec3 worldPos = c + fxOff + position * (uVoxelSize * 0.96);
+    vColor       = fxColorTint(aInstanceColor, c);
     gl_Position  = projectionMatrix * modelViewMatrix * vec4(worldPos, 1.0);
   }
 `;
@@ -55,6 +61,22 @@ export class Voxelizer {
     this._dirty     = true;
     this._busy      = false;
     this._rebuildTimer = null;
+    // Persistent FX uniform slots, shared by reference with every rebuilt
+    // material so per-frame syncFxUniforms writes survive a rebuild.
+    this._fxU = {
+      uTime:           { value: 0 },
+      uHit:            { value: new THREE.Vector3(0, 0, 1e6) },
+      uColor:          { value: new THREE.Vector3(1, 1, 1) },
+      uRadius:         { value: 2.0 },
+      uSpeed:          { value: 4.0 },
+      uIntensity:      { value: 0.6 },
+      uEffect:         { value: 0 },
+      uActive:         { value: 0 },
+      uDuration:       { value: 2.5 },
+      uEffectStrength: { value: 0 },
+      uWindDir:        { value: new THREE.Vector3() },
+      uEmissive:       { value: 2.0 },
+    };
   }
 
   setVoxelSize(s) {
@@ -88,9 +110,26 @@ export class Voxelizer {
     }
   }
 
-  // No-op — voxels are static. Kept as a stub so main.js can call this
-  // unconditionally (and so re-wiring FX later is a one-line restore).
-  syncFxUniforms() { /* intentionally empty */ }
+  // Mirror the splat dyno's FX state into this material's uniform slots.
+  // Called per frame from main.js with effects.js's `uniforms` (dyno
+  // wrappers, so each carries its live value under `.value`). Cheap:
+  // scalar copies + two Vector3 copies.
+  syncFxUniforms(u) {
+    if (!u) return;
+    const f = this._fxU;
+    f.uTime.value           = u.time?.value ?? 0;
+    f.uRadius.value         = u.radius?.value ?? 2.0;
+    f.uSpeed.value          = u.speed?.value ?? 4.0;
+    f.uIntensity.value      = u.intensity?.value ?? 0.6;
+    f.uEffect.value         = u.effect?.value ?? 0;
+    f.uActive.value         = u.active?.value ?? 0;
+    f.uDuration.value       = u.duration?.value ?? 2.5;
+    f.uEffectStrength.value = u.effectStrength?.value ?? 0;
+    f.uEmissive.value       = u.emissive?.value ?? 2.0;
+    if (u.hit?.value)     f.uHit.value.copy(u.hit.value);
+    if (u.color?.value)   f.uColor.value.copy(u.color.value);
+    if (u.windDir?.value) f.uWindDir.value.copy(u.windDir.value);
+  }
 
   rebuild() {
     if (this._busy) return;
@@ -182,6 +221,9 @@ export class Voxelizer {
         uniforms: {
           uVoxelSize: { value: vs },
           uOpacity:   { value: this.opacity },
+          // FX slots are shared BY REFERENCE with this._fxU so the per-frame
+          // sync keeps working across rebuilds without re-binding.
+          ...this._fxU,
         },
         transparent: true,
         depthWrite:  true,
@@ -189,6 +231,11 @@ export class Voxelizer {
 
       const mesh = new THREE.Mesh(geom, mat);
       mesh.frustumCulled = false;       // FX offsets push past world bounds
+      // Mark as a derived (instanced) layer so the FX raycaster skips it:
+      // Mesh.raycast on an InstancedBufferGeometry only tests the single
+      // origin prototype, never the scattered instances, so a hit here is
+      // meaningless. Clicks are raycast against the source splat instead.
+      mesh.userData.fxDerived = true;
       mesh.position.copy(this.splatMesh.position);
       mesh.quaternion.copy(this.splatMesh.quaternion);
       mesh.scale.copy(this.splatMesh.scale);

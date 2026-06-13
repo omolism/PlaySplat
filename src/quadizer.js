@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { FX_UNIFORMS, FX_FUNCTIONS } from "./fx-glsl.js";
 
 // ---------------------------------------------------------------------------
 // Quadizer — one camera-facing billboard quad per splat, colored by its
@@ -18,16 +19,20 @@ const QUAD_VERT = /* glsl */`
   attribute vec3 aInstanceColor;
   varying vec3 vColor;
   varying vec2 vLocalUv;
+  ${FX_UNIFORMS}
+  ${FX_FUNCTIONS}
   void main() {
-    // Billboards are intentionally static — they don't react to the splat's
-    // click FX. (To re-enable, restore fxOffset/fxColorTint here and the
-    // shader-uniform sync in syncFxUniforms below — see src/fx-glsl.js.)
-    vColor           = aInstanceColor;
+    // Click FX: displace and tint each billboard with the same hit/time/
+    // effect state that drives the splat layer. The hit point is in the
+    // splat's object space, shared by the billboard centers, so fxOffset
+    // applies directly to aInstanceCenter before the camera-facing build.
+    vec3 c           = aInstanceCenter + fxOffset(aInstanceCenter);
+    vColor           = fxColorTint(aInstanceColor, aInstanceCenter);
     // PlaneGeometry's position is centered at origin with extents -0.5..0.5,
     // so position.xy doubles as a centered local UV in the [-0.5, 0.5] range
     // — exactly what the circle discard test needs.
     vLocalUv         = position.xy;
-    vec4 worldCenter = modelMatrix * vec4(aInstanceCenter, 1.0);
+    vec4 worldCenter = modelMatrix * vec4(c, 1.0);
     vec4 viewCenter  = viewMatrix  * worldCenter;
     vec3 corner      = vec3(position.x, position.y, 0.0) * uQuadSize;
     vec4 viewPos     = vec4(viewCenter.xyz + corner, 1.0);
@@ -65,6 +70,22 @@ export class Quadizer {
     this.opacity    = 0;
     this.mesh       = null;
     this._busy      = false;
+    // Persistent FX uniform slots shared by reference with every rebuilt
+    // material, so per-frame syncFxUniforms writes survive a rebuild.
+    this._fxU = {
+      uTime:           { value: 0 },
+      uHit:            { value: new THREE.Vector3(0, 0, 1e6) },
+      uColor:          { value: new THREE.Vector3(1, 1, 1) },
+      uRadius:         { value: 2.0 },
+      uSpeed:          { value: 4.0 },
+      uIntensity:      { value: 0.6 },
+      uEffect:         { value: 0 },
+      uActive:         { value: 0 },
+      uDuration:       { value: 2.5 },
+      uEffectStrength: { value: 0 },
+      uWindDir:        { value: new THREE.Vector3() },
+      uEmissive:       { value: 2.0 },
+    };
   }
 
   setQuadSize(s) {
@@ -89,9 +110,25 @@ export class Quadizer {
     }
   }
 
-  // No-op — billboards are static. Kept as a stub so main.js can call this
-  // unconditionally (re-wiring FX later is a one-line restore).
-  syncFxUniforms() { /* intentionally empty */ }
+  // Mirror the splat dyno's FX state into this material's uniform slots.
+  // Called per frame from main.js with effects.js's `uniforms` (dyno
+  // wrappers, each carrying its live value under `.value`).
+  syncFxUniforms(u) {
+    if (!u) return;
+    const f = this._fxU;
+    f.uTime.value           = u.time?.value ?? 0;
+    f.uRadius.value         = u.radius?.value ?? 2.0;
+    f.uSpeed.value          = u.speed?.value ?? 4.0;
+    f.uIntensity.value      = u.intensity?.value ?? 0.6;
+    f.uEffect.value         = u.effect?.value ?? 0;
+    f.uActive.value         = u.active?.value ?? 0;
+    f.uDuration.value       = u.duration?.value ?? 2.5;
+    f.uEffectStrength.value = u.effectStrength?.value ?? 0;
+    f.uEmissive.value       = u.emissive?.value ?? 2.0;
+    if (u.hit?.value)     f.uHit.value.copy(u.hit.value);
+    if (u.color?.value)   f.uColor.value.copy(u.color.value);
+    if (u.windDir?.value) f.uWindDir.value.copy(u.windDir.value);
+  }
 
   rebuild() {
     if (this._busy) return 0;
@@ -142,6 +179,9 @@ export class Quadizer {
           uQuadSize: { value: this.quadSize },
           uOpacity:  { value: this.opacity },
           uIsCircle: { value: this.shape === "circle" ? 1.0 : 0.0 },
+          // FX slots shared BY REFERENCE with this._fxU so per-frame sync
+          // keeps working across rebuilds without re-binding.
+          ...this._fxU,
         },
         transparent: true,
         depthWrite:  true,
@@ -149,6 +189,9 @@ export class Quadizer {
 
       const mesh = new THREE.Mesh(geom, mat);
       mesh.frustumCulled = false;
+      // See Voxelizer: derived instanced layers can't be raycast per-instance,
+      // so the FX raycaster skips them and hits the source splat instead.
+      mesh.userData.fxDerived = true;
       mesh.position.copy(this.splatMesh.position);
       mesh.quaternion.copy(this.splatMesh.quaternion);
       mesh.scale.copy(this.splatMesh.scale);

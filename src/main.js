@@ -3091,14 +3091,27 @@ async function loadSplat() {
       -((clientY - rect.top)  / rect.height) * 2 + 1,
     );
     raycaster.setFromCamera(ndc, camera);
-    // Intersect EVERY visible splat layer, not just the primary, so a click
-    // on an imported secondary layer (primary hidden) still registers. The
-    // hit's `object` is the specific mesh struck; local-space coordinates
-    // are computed against THAT mesh, not always the primary — otherwise
-    // the scan effect would be aimed at the wrong object-space point.
-    const targets = sceneLayers?.getVisibleMeshes?.() ?? [splat];
+    // Raycast the SPLAT layers only. The derived voxel / billboard layers are
+    // instanced meshes (userData.fxDerived) whose Mesh.raycast tests a single
+    // origin prototype, never the scattered instances — a hit there is bogus.
+    // They follow the splat's hit point via the shared FX uniform, so the
+    // click just needs the splat-surface hit. Filtering them also fixes the
+    // old origin-prototype false hit when a derived layer was co-visible.
+    const visible = sceneLayers?.getVisibleMeshes?.() ?? [splat];
+    let targets = visible.filter(m => !m.userData?.fxDerived);
+    // If every visible layer is derived (the user hid the splat via the Scene
+    // panel and is looking at voxels / billboards only), fall back to the
+    // FX-bound splat: force it visible for the raycast test ONLY. No render
+    // happens inside this event handler, so it stays hidden on screen, and
+    // the derived layers animate from the resulting hit point.
+    let forced = null, forcedVis = false;
+    if (!targets.length) {
+      const fxSplat = effects?.mesh || splat;
+      if (fxSplat) { forced = fxSplat; forcedVis = fxSplat.visible; fxSplat.visible = true; targets = [fxSplat]; }
+    }
     if (!targets.length) return null;
     const hits = raycaster.intersectObjects(targets, false);
+    if (forced) forced.visible = forcedVis;
     if (!hits?.[0]) return null;
     const hitObj = hits[0].object || splat;
     return { hit: hits[0], local: hitObj.worldToLocal(hits[0].point.clone()), object: hitObj };
