@@ -24,7 +24,6 @@
 
 import * as THREE from "three";
 
-const FULL_TURN_S    = 48;    // orbit: seconds per revolution (museum pace)
 const EASE_IN_S      = 1.6;   // ramp from rest into full speed (both modes)
 const SEQ_DEFAULT_S  = 4.0;   // sequence: seconds spent per viewpoint segment
 
@@ -36,9 +35,18 @@ export class Turntable {
     this.mode     = "orbit";
     // orbit state
     this.center   = new THREE.Vector3();
-    this.rOrbit   = 5;
-    this.height   = 1;
     this.theta    = 0;
+    this._baseR   = 5;   // bbox radius captured at start()
+    // Live orbit parameters — bound to the Studio "Orbit Tour" folder so the
+    // user can reshape the tour while it plays. All distances are multiples
+    // of the scene's bounding radius, so they read sanely on any scene.
+    this.orbit = {
+      turnSeconds: 40,    // seconds for one full revolution
+      radiusScale: 1.6,   // orbit radius        = radiusScale * boundsRadius
+      heightScale: 0.30,  // camera height        = heightScale * boundsRadius
+      lookHeight:  0.05,  // look-at point height = lookHeight  * boundsRadius
+      direction:   1,     // +1 clockwise, -1 counter-clockwise
+    };
     // sequence state
     this.posCurve = null;
     this.tgtCurve = null;
@@ -52,16 +60,14 @@ export class Turntable {
   start(center, radius) {
     this.mode = "orbit";
     this.center.copy(center);
-    // Seed the orbit from the current pose so entry is seamless: keep the
-    // user's compass angle and height, but clamp the orbit radius into a
-    // band that's guaranteed to frame the bounding sphere.
+    this._baseR = Math.max(radius, 0.01);
+    // Seed the starting compass angle from the current pose so the orbit
+    // eases out of wherever the user is looking; distance/height/speed are
+    // all driven live from this.orbit so the Studio sliders take effect
+    // immediately, even mid-tour.
     const off = this.camera.position.clone().sub(center);
-    const horiz = Math.hypot(off.x, off.z);
-    this.theta  = Math.atan2(off.z, off.x);
-    this.rOrbit = THREE.MathUtils.clamp(horiz, radius * 0.9, radius * 2.2);
-    if (!Number.isFinite(this.rOrbit) || this.rOrbit < 1e-3) this.rOrbit = radius * 1.5;
-    this.height = THREE.MathUtils.clamp(off.y, radius * 0.1, radius * 0.9);
-    this._ease  = 0;
+    this.theta = Math.atan2(off.z, off.x);
+    this._ease = 0;
     this.active = true;
   }
 
@@ -115,14 +121,24 @@ export class Turntable {
       return;
     }
 
-    // orbit
-    this.theta += (Math.PI * 2 / FULL_TURN_S) * dt * ease;
+    // orbit — all dimensions read live from this.orbit so Studio sliders
+    // reshape the tour mid-flight.
+    const o = this.orbit;
+    const turn = Math.max(o.turnSeconds, 1);
+    const dir  = o.direction < 0 ? -1 : 1;
+    this.theta += (Math.PI * 2 / turn) * dt * ease * dir;
+    const r = this._baseR * o.radiusScale;
+    const h = this._baseR * o.heightScale;
     this.camera.position.set(
-      this.center.x + Math.cos(this.theta) * this.rOrbit,
-      this.center.y + this.height,
-      this.center.z + Math.sin(this.theta) * this.rOrbit,
+      this.center.x + Math.cos(this.theta) * r,
+      this.center.y + h,
+      this.center.z + Math.sin(this.theta) * r,
     );
-    this.controls.target.copy(this.center);
+    this.controls.target.set(
+      this.center.x,
+      this.center.y + this._baseR * o.lookHeight,
+      this.center.z,
+    );
     this.controls.update();
   }
 }
