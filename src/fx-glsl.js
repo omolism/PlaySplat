@@ -230,11 +230,14 @@ export const FX_FUNCTIONS = /* glsl */`
     return vec4(off * s * FX_DAMP, clamp(crest * s, 0.0, 1.0));
   }
 
-  // Apply the crest from fxEval().w as the standard tint + emissive lift.
+  // Apply the crest from fxEval().w as a MULTIPLICATIVE tint, matching the
+  // splat dyno's `rgba.rgb *= mix(vec3(1.0), uColor, crest)` semantics.
+  // Critical: when the Color tint checkbox is OFF the dyno sets uColor to
+  // WHITE, and multiply-by-white is a no-op. The earlier lerp-toward-color
+  // + additive emissive version washed the whole instancer layer white in
+  // exactly that state.
   vec3 fxTintApply(vec3 baseColor, float crest) {
-    vec3 tinted = mix(baseColor, uColor, clamp(crest * 1.4, 0.0, 0.85));
-    tinted += uColor * crest * uEmissive * 0.35;
-    return tinted;
+    return baseColor * mix(vec3(1.0), uColor, clamp(crest, 0.0, 1.0));
   }
 
   // ---- Legacy two-call wrappers (evaluate the field twice — prefer fxEval)

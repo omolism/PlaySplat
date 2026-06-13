@@ -57,6 +57,7 @@ import { playSound, primeSound } from "./sounds.js";
 }
 import { UsdLayers } from "./usd-layers.js";
 import { Playbar } from "./playbar.js";
+import { Turntable } from "./turntable.js";
 import { UsdAnnotations } from "./usd-annotations.js";
 import { uniforms as effectUniforms } from "./effects.js";
 import { loadColmapImages, buildColmapFrustums, colmapCameraPosition, colmapCameraRotation } from "./colmap-loader.js";
@@ -516,6 +517,14 @@ controls.zoomSpeed = 0.9;
 controls.panSpeed = 0.7;
 controls.minDistance = 0.05;
 controls.maxDistance = 200;
+
+// Procedural bbox-derived orbit for non-bundled scenes — see turntable.js.
+// The authored camera move stays the tour for the bundled scene; this is
+// the zero-config fallback that frames anything the user drags in.
+const turntable = new Turntable({ camera, controls });
+window.__turntable = turntable;
+// Grabbing the orbit cancels the tour, mirroring the camera move's lockout.
+canvas.addEventListener("pointerdown", () => turntable.stop(), { capture: true });
 
 // ---------------------------------------------------------------------------
 // Resize
@@ -1202,6 +1211,10 @@ async function createSplat(options) {
   const center   = new THREE.Vector3(); bbox.getCenter(center);
   const size     = new THREE.Vector3(); bbox.getSize(size);
   const radius   = Math.max(size.x, size.y, size.z, 1.0) * 0.5;
+  // Stash the bounds on the mesh so scene-agnostic camera templates
+  // (Turntable tour) can frame ANY loaded splat, not just the bundled
+  // scene whose flythrough was hand-authored in its own coordinates.
+  m.userData.bounds = { center: center.clone(), radius };
   return { splat: m, center, size, radius };
 }
 
@@ -3910,6 +3923,26 @@ async function loadSplat() {
     statusEl.textContent = `Interactive layer → ${active === splat ? "primary" : "secondary"}`;
   };
 
+  // Tour routing — the Playbar's Tour button (and anything else that wants
+  // "give me a camera tour of what I'm looking at") goes through here. The
+  // bundled scene keeps its hand-authored cinematic; every other layer gets
+  // the procedural bbox turntable, so Tour works for ANY dropped-in splat
+  // (the train scene's origin differs wildly from the garden's — pointing
+  // the authored clip at it would frame empty space).
+  window.__tourToggle = function _tourToggle() {
+    const active = sceneLayers.getInteractive()?.mesh || splat;
+    if (active === splat) {
+      turntable.stop();
+      window.__camMovePlayPause?.();
+      return;
+    }
+    window.__camMoveStop?.();
+    const b = active?.userData?.bounds;
+    if (!b) { window.__toast?.("No bounds available for this layer"); return; }
+    const on = turntable.toggle(b.center, b.radius);
+    window.__toast?.(on ? "Orbit tour — drag to take over" : "Tour stopped");
+  };
+
   // Hidden file input wired to Scene panel's "+ Add" button.
   const addSplatInput = document.createElement("input");
   addSplatInput.type   = "file";
@@ -4153,6 +4186,9 @@ renderer.setAnimationLoop(() => {
 
   // Effect uniforms
   if (effects) effects.update(dt);
+
+  // Procedural orbit tour (no-op unless started via __tourToggle)
+  turntable.update(dt);
 
   // WASD / QE flythrough
   if (window.__wasdStep) window.__wasdStep(dt);

@@ -8358,3 +8358,41 @@ body.intro-playing #playbar { opacity: 0; pointer-events: none; transition: opac
 }
 #playbar .pb-layers .pb-btn { font-weight: 600; }
 #playbar .pb-tour { font-weight: 600; }
+
+/* Playbar sub-form pills - visible only while their representation is
+   active. Smaller and dimmer than the layer buttons so they read as
+   children of the toggle to their left. */
+#playbar .pb-sub {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  margin: 0 2px 0 -2px;
+  padding: 2px;
+  border: 1px solid var(--hair, rgba(255, 255, 255, 0.06));
+  border-radius: calc(var(--radius-sm, 9px) - 2px);
+}
+#playbar .pb-sub.show { display: inline-flex; }
+#playbar .pb-subchip {
+  padding: 0 7px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: var(--text-dim, rgba(255, 255, 255, 0.40));
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+#playbar .pb-subchip:hover {
+  background: var(--hover-strong, rgba(255, 255, 255, 0.08));
+  color: var(--text, rgba(255, 255, 255, 0.92));
+}
+#playbar .pb-subchip.active {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text, rgba(255, 255, 255, 0.92));
+}
