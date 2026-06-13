@@ -231,6 +231,13 @@ shareBtn?.addEventListener("click", () => {
   if (typeof window.__copyViewLink === "function") window.__copyViewLink();
   else statusEl.textContent = "Scene still loading, try again in a moment";
 });
+// "Play viewpoint tour" — strings the saved viewpoints into a smooth
+// Catmull-Rom flight via the Turntable's sequence mode (wired in loadSplat).
+const playVpBtn = document.getElementById("play-viewpoints");
+playVpBtn?.addEventListener("click", () => {
+  if (typeof window.__playViewpointTour === "function") window.__playViewpointTour();
+  else statusEl.textContent = "Scene still loading, try again in a moment";
+});
 const handToggle   = document.getElementById("hand-toggle");
 const handVideo    = document.getElementById("hand-video");
 const handCursor   = document.getElementById("hand-cursor");
@@ -3946,8 +3953,26 @@ async function loadSplat() {
     window.__camMoveStop?.();
     const b = active?.userData?.bounds;
     if (!b) { window.__toast?.("No bounds available for this layer"); return; }
-    const on = turntable.toggle(b.center, b.radius);
+    const on = turntable.toggleOrbit(b.center, b.radius);
     window.__toast?.(on ? "Orbit tour — drag to take over" : "Tour stopped");
+  };
+
+  // Viewpoint-sequence tour — strings the saved Viewpoints into one smooth
+  // Catmull-Rom flight. This is the user-authored counterpart to the
+  // procedural orbit: stamp a few viewpoints, press play, the camera eases
+  // through each and loops. Works for any scene (the poses are whatever the
+  // user saved, in the scene's own frame).
+  window.__playViewpointTour = function _playViewpointTour() {
+    window.__camMoveStop?.();
+    const vps = annotations?.viewpoints ?? [];
+    if (vps.length < 2) {
+      window.__toast?.("Add at least 2 viewpoints first (press V)");
+      return false;
+    }
+    const poses = vps.map(v => ({ position: v.position, target: v.target }));
+    const on = turntable.playSequence(poses);
+    window.__toast?.(on ? `Touring ${vps.length} viewpoints — drag to take over` : "Tour stopped");
+    return on;
   };
 
   // Hidden file input wired to Scene panel's "+ Add" button.
