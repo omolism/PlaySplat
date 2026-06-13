@@ -36,13 +36,26 @@ export class BlobTracker {
     this.params = {
       enable:       true,    // the requested click feedback — on by default
       boxSize:      120,     // base box edge in CSS px (jittered per blob)
-      lifetime:     2.4,     // seconds from spawn to full fade-out
-      maxBlobs:     12,      // FIFO cap
+      lifetime:     2.4,     // seconds of the bright "active" phase
+      // Persistence reframes the tracker as a trace rather than a blip:
+      //   0   = ephemeral — the box fades fully and is removed (a blip).
+      //   1   = enduring  — after the bright phase it settles to a faint
+      //         residual and STAYS, so every visitor's touch accumulates on
+      //         the garden as a collective map of where people looked.
+      //   0<p<1 = it lingers, but dimmer.
+      // The bright spawn pulse is always present; persistence only governs
+      // what remains afterward. In an exhibition, raise maxBlobs so the
+      // accumulation has room to build.
+      persistence:  0.0,
+      maxBlobs:     12,      // FIFO cap (raise for exhibition accumulation)
       connections:  true,    // draw connector lines between trackers
       scanlines:    true,    // CRT scanline fill inside each box
       glow:         true,    // soft glow on box edges + connectors
       label:        true,    // confidence number tag
     };
+    // Peak alpha of a fully-persistent residual trace — visible as history
+    // without competing with freshly-spawned (bright) boxes.
+    this._RESIDUAL = 0.20;
 
     // Full-screen overlay canvas: above the WebGL viewport, below the UI
     // panels, click-through so it never eats interactions.
@@ -76,6 +89,9 @@ export class BlobTracker {
     this.params.enable = !!on;
     if (!on) { this.blobs.length = 0; this._clear(); }
   }
+
+  // Wipe the accumulated traces — the exhibition "reset the canvas" gesture.
+  clearAll() { this.blobs.length = 0; this._clear(); }
 
   // Click → drop a tracker at the world-space hit point.
   addBlob(worldPos) {
@@ -113,10 +129,14 @@ export class BlobTracker {
     if (!this.params.enable) return;
     this._elapsed += dt;
     const life = Math.max(this.params.lifetime, 0.1);
+    const persist = Math.max(0, Math.min(1, this.params.persistence));
+    const residual = persist * this._RESIDUAL;
 
-    // Advance + cull expired.
+    // Advance time on every blob. Cull only the EPHEMERAL ones once faded —
+    // persistent traces (residual > 0) are kept and the FIFO cap (enforced
+    // in addBlob) is the only thing that ever retires them.
     for (const b of this.blobs) b.t += dt;
-    this.blobs = this.blobs.filter(b => b.t < life);
+    if (residual <= 0.001) this.blobs = this.blobs.filter(b => b.t < life);
 
     const ctx = this.ctx, dpr = this._dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -129,10 +149,13 @@ export class BlobTracker {
       const p = this._project(b.world);
       if (!p) continue;
       const a = b.t / life;                                   // 0..1 progress
-      // spawn pop (fast ease-in) then linear-ish fade-out tail
-      const grow  = Math.min(a / 0.12, 1);
-      const fade  = a > 0.6 ? 1 - (a - 0.6) / 0.4 : 1;
-      const alpha = Math.max(0, Math.min(1, grow * fade));
+      // spawn pop (fast ease-in) then fade-out tail toward the residual floor
+      const grow   = Math.min(a / 0.12, 1);
+      const fade   = a > 0.6 ? 1 - (a - 0.6) / 0.4 : 1;
+      const bright = Math.max(0, Math.min(1, grow * fade));
+      // Persistent traces never drop below the residual level; ephemeral
+      // ones (residual 0) fall to zero and get culled next frame.
+      const alpha  = Math.max(bright, residual);
       pts.push({ x: p.x + b.jx, y: p.y + b.jy, s: b.size * (0.85 + 0.15 * grow), alpha, id: b.id });
     }
     if (!pts.length) return;

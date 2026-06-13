@@ -2081,12 +2081,17 @@ async function loadSplat() {
   const _bp = blobTracker.params;
   fBlob.add(_bp, "enable").name("Enable");
   fBlob.add(_bp, "boxSize",  40, 320, 1).name("Box Size");
-  fBlob.add(_bp, "lifetime", 0.5, 8, 0.1).name("Lifetime (s)");
-  fBlob.add(_bp, "maxBlobs", 1, 32, 1).name("Max Trackers");
+  fBlob.add(_bp, "lifetime", 0.5, 8, 0.1).name("Active Fade (s)");
+  // Ephemeral ↔ enduring: 0 = the box fades and vanishes; 1 = it settles to
+  // a faint residual and stays, so visitors' touches accumulate as a
+  // collective trace on the garden.
+  fBlob.add(_bp, "persistence", 0, 1, 0.01).name("Persistence");
+  fBlob.add(_bp, "maxBlobs", 1, 300, 1).name("Max Trackers");
   fBlob.add(_bp, "connections").name("Connectors");
   fBlob.add(_bp, "scanlines").name("Scanlines");
   fBlob.add(_bp, "glow").name("Glow");
   fBlob.add(_bp, "label").name("Confidence Label");
+  fBlob.add({ clear: () => blobTracker.clearAll() }, "clear").name("Clear Traces");
 
   const fOverlay = gui.addFolder("Camera Movement");   // renamed from "Overlays"
   let hdrTex = null;
