@@ -3300,6 +3300,11 @@ async function loadSplat() {
   // window (fxDur + fadeTail) closes. Persistence and Mix are NOT
   // modulated — the user's GUI values are used as-is the whole time, so
   // there's zero surprise. Consecutive clicks reset the timer.
+  // User preference: interaction should NOT auto-engage echo trails by
+  // default. Echo Trails remains available as a manual toggle in the
+  // Post-Process folder; flip this to true to restore the click-driven
+  // auto-engage behaviour.
+  const AUTO_ECHO_ON_CLICK = false;
   let _echoAutoTimer = null;
   const _echoGuiCtls = [];
   function refreshEchoGui() {
@@ -3313,6 +3318,7 @@ async function loadSplat() {
     for (const c of _echoGuiCtls) c.updateDisplay();
   }
   function autoEnableEchoForClick() {
+    if (!AUTO_ECHO_ON_CLICK) return;   // default: interaction leaves echo off
     if (!postfx?.params) return;
     // Skip the auto-engaged echo trails on touch devices — the trail
     // pass is fill-rate-heavy and reads poorly under the larger touch
