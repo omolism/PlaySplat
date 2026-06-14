@@ -495,14 +495,33 @@ export class BlobTracker {
   // and a live telemetry readout. Portable (no external libraries; the scene
   // backdrop is baked in as a data-URI), so it travels as a keepsake.
   exportHeatmapHTML({ background = null } = {}) {
-    const raw = this._collectTrajectory();
-    if (!raw.length) { window.__toast?.("No interactions to export yet"); return; }
+    if (!this.log.length) { window.__toast?.("No interactions to export yet"); return; }
     const W = this._w, H = this._h;
-    const pts = raw.map((p) => ({
-      x: +(p.x / W).toFixed(5), y: +(p.y / H).toFixed(5),
-      t: +(p.t).toFixed(3), track: p.track, fx: p.effect,
-    }));
     const st = this._sessionStats();
+
+    // Project every logged interaction and carry the full record (screen +
+    // world coords, track id, effect, representation flags) so the dashboard
+    // can derive its satellite panels from the same data.
+    const pts = [];
+    let xmin = Infinity, xmax = -Infinity, zmin = Infinity, zmax = -Infinity;
+    for (const r of this.log) {
+      const p = this._project(this._tmp.set(r.x, r.y, r.z));
+      if (!p) continue;
+      pts.push({
+        x: +(p.x / W).toFixed(5), y: +(p.y / H).toFixed(5),
+        t: +(r.t).toFixed(3), track: r.track, fx: r.effect || "",
+        rep: (r.splat ? 1 : 0) | (r.quad ? 2 : 0) | (r.voxel ? 4 : 0),
+        wx: +r.x.toFixed(3), wz: +r.z.toFixed(3),
+      });
+      xmin = Math.min(xmin, r.x); xmax = Math.max(xmax, r.x);
+      zmin = Math.min(zmin, r.z); zmax = Math.max(zmax, r.z);
+    }
+    if (!pts.length) { window.__toast?.("Interactions are off-screen from this view"); return; }
+
+    // Full per-effect tally (the timeline + distribution panels use all of it).
+    const ec = {};
+    for (const r of this.log) ec[r.effect || "(none)"] = (ec[r.effect || "(none)"] || 0) + 1;
+    const effects = Object.entries(ec).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
 
     // bake a dimmed, downscaled backdrop so the export is self-contained
     let bg = null;
@@ -520,11 +539,12 @@ export class BlobTracker {
 
     const data = {
       pts, bg, aspect: W / H, dur: st.dur || 0, t0: this.log[0]?.t || 0,
+      effects,
+      world: { xmin: +xmin.toFixed(3), xmax: +xmax.toFixed(3), zmin: +zmin.toFixed(3), zmax: +zmax.toFixed(3) },
       stats: {
         n: st.n, ipm: +(st.ipm || 0).toFixed(1),
         centroid: (st.centroid || []).map((v) => +v.toFixed(2)),
         extent: (st.extent || []).map((v) => +v.toFixed(2)),
-        topEffects: st.topEffects || [],
       },
     };
     const json = JSON.stringify(data).replace(/</g, "\\u003c");
@@ -608,49 +628,65 @@ export class BlobTracker {
 // ---------------------------------------------------------------------------
 function _trajViewer() {
   const D = window.__TRAJ__;
-  const cv = document.getElementById("c"), ctx = cv.getContext("2d");
-  const pp = document.getElementById("pp"), sc = document.getElementById("sc");
-  const rd = document.getElementById("rd"), metrics = document.getElementById("metrics");
   const F = '"Helvetica Neue", "Inter", Arial, sans-serif';
-  const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-  let vw = 0, vh = 0, dpr = 1, stage = { x: 0, y: 0, w: 0, h: 0 };
-  let bgImg = null;
-  if (D.bg) { bgImg = new Image(); bgImg.src = D.bg; }
-
+  const $ = (id) => document.getElementById(id);
+  const N = D.pts.length;
+  const dur = D.dur || 1;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const fmtT = (s) => { s = Math.max(0, s | 0); const m = (s / 60) | 0, ss = s % 60; return (m < 10 ? "0" : "") + m + ":" + (ss < 10 ? "0" : "") + ss; };
 
-  function layout() {
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    vw = window.innerWidth; vh = window.innerHeight;
-    cv.width = vw * dpr; cv.height = vh * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    let w = vw, h = vw / D.aspect;
-    if (h > vh) { h = vh; w = vh * D.aspect; }
-    stage = { x: (vw - w) / 2, y: (vh - h) / 2, w, h };
+  function mk(id) { const cv = $(id); if (!cv) return null; return { cv, ctx: cv.getContext("2d"), w: 0, h: 0 }; }
+  function fit(c) {
+    if (!c) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const r = c.cv.getBoundingClientRect();
+    c.w = Math.max(1, r.width); c.h = Math.max(1, r.height);
+    c.cv.width = Math.round(c.w * dpr); c.cv.height = Math.round(c.h * dpr);
+    c.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  const C = mk("c"), DIST = mk("dist"), ACT = mk("act"), PLAN = mk("plan"), DIAL = mk("dial"), TL = mk("tl");
+  const playheadEl = $("playhead"), rd = $("rd"), pp = $("pp");
+  const LABW = 96;
+
+  let bgImg = null;
+  if (D.bg) { bgImg = new Image(); bgImg.src = D.bg; bgImg.onload = () => renderAll(progress); }
+
+  const topEffects = D.effects.slice(0, 6);
+
+  const NB = 30;
+  const buckets = new Array(NB).fill(0);
+  for (const p of D.pts) { const b = clamp(Math.floor(((p.t - D.t0) / dur) * NB), 0, NB - 1); buckets[b]++; }
+  const bucketMax = Math.max(1, Math.max.apply(null, buckets));
+
+  // central stage (contain the trajectory aspect inside the #c canvas)
+  let stage = { x: 0, y: 0, w: 0, h: 0 };
+  function layoutStage() {
+    let w = C.w, h = C.w / D.aspect;
+    if (h > C.h) { h = C.h; w = C.h * D.aspect; }
+    stage = { x: (C.w - w) / 2, y: (C.h - h) / 2, w, h };
   }
   const SX = (nx) => stage.x + nx * stage.w, SY = (ny) => stage.y + ny * stage.h;
+  const headIndex = (p) => clamp(Math.floor(p * N), 1, N) - 1;   // matches the central head point
 
-  function render(progress) {
-    const N = D.pts.length, count = Math.max(1, Math.min(N, Math.floor(progress * N)));
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, vw, vh);
-    ctx.fillStyle = "#05070a"; ctx.fillRect(0, 0, vw, vh);
+  function drawCentral(p) {
+    if (!C.w) return null;
+    const ctx = C.ctx, count = clamp(Math.floor(p * N), 1, N);
+    ctx.clearRect(0, 0, C.w, C.h);
+    ctx.fillStyle = "#06080a"; ctx.fillRect(0, 0, C.w, C.h);
     if (bgImg && bgImg.complete && bgImg.naturalWidth) ctx.drawImage(bgImg, stage.x, stage.y, stage.w, stage.h);
-
+    ctx.strokeStyle = "rgba(220,228,214,0.12)"; ctx.lineWidth = 1; ctx.strokeRect(0.5, 0.5, C.w - 1, C.h - 1);
     ctx.globalCompositeOperation = "lighter";
-    // ghost of the full path — a faint neutral thread
-    ctx.strokeStyle = "rgba(150,170,150,0.045)"; ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let i = 0; i < N; i++) { const p = D.pts[i], x = SX(p.x), y = SY(p.y); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.strokeStyle = "rgba(150,170,150,0.045)"; ctx.lineWidth = 1; ctx.beginPath();
+    for (let i = 0; i < N; i++) { const q = D.pts[i]; i ? ctx.lineTo(SX(q.x), SY(q.y)) : ctx.moveTo(SX(q.x), SY(q.y)); }
     ctx.stroke();
-    // soft sage-white blooms for recent points
-    for (let i = Math.max(0, count - 60); i < count; i++) {
-      const p = D.pts[i], x = SX(p.x), y = SY(p.y);
-      const g = ctx.createRadialGradient(x, y, 0, x, y, 38);
+    for (let i = Math.max(0, count - 50); i < count; i++) {
+      const q = D.pts[i], x = SX(q.x), y = SY(q.y);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 34);
       g.addColorStop(0, "rgba(208,222,210,0.10)"); g.addColorStop(1, "rgba(208,222,210,0)");
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 38, 0, 7); ctx.fill();
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 34, 0, 7); ctx.fill();
     }
-    // delicate filament trajectory
-    ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.shadowColor = "rgba(225,235,225,0.5)";
+    ctx.lineCap = "round"; ctx.shadowColor = "rgba(225,235,225,0.5)";
     for (let i = 1; i < count; i++) {
       const a = D.pts[i - 1], b = D.pts[i], rec = i / count;
       ctx.shadowBlur = 2;
@@ -659,87 +695,211 @@ function _trajViewer() {
       ctx.beginPath(); ctx.moveTo(SX(a.x), SY(a.y)); ctx.lineTo(SX(b.x), SY(b.y)); ctx.stroke();
     }
     ctx.shadowBlur = 0; ctx.globalCompositeOperation = "source-over";
-    // nodes
-    for (let i = 0; i < count; i++) { const p = D.pts[i]; ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.beginPath(); ctx.arc(SX(p.x), SY(p.y), 1.4, 0, 7); ctx.fill(); }
-    // head reticle
+    for (let i = 0; i < count; i++) { const q = D.pts[i]; ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.beginPath(); ctx.arc(SX(q.x), SY(q.y), 1.3, 0, 7); ctx.fill(); }
     const head = D.pts[count - 1], hx = SX(head.x), hy = SY(head.y);
-    ctx.strokeStyle = "rgba(232,238,228,0.85)"; ctx.lineWidth = 1;
-    ctx.strokeRect(hx - 6, hy - 6, 12, 12);
+    ctx.strokeStyle = "rgba(232,238,228,0.85)"; ctx.lineWidth = 1; ctx.strokeRect(hx - 6, hy - 6, 12, 12);
     ctx.beginPath();
     ctx.moveTo(hx - 11, hy); ctx.lineTo(hx - 8, hy); ctx.moveTo(hx + 8, hy); ctx.lineTo(hx + 11, hy);
     ctx.moveTo(hx, hy - 11); ctx.lineTo(hx, hy - 8); ctx.moveTo(hx, hy + 8); ctx.lineTo(hx, hy + 11); ctx.stroke();
     ctx.letterSpacing = "1px"; ctx.font = "10px " + F; ctx.fillStyle = "rgba(232,238,228,0.85)";
     ctx.fillText(String(head.track).padStart(3, "0") + (head.fx ? ("  " + head.fx) : ""), hx + 10, hy + 3.5);
     ctx.letterSpacing = "0px";
-
-    rd.textContent = "PT " + count + " / " + N + "   T+" + fmtT(head.t - D.t0);
+    return head;
   }
 
-  function fillMetrics() {
-    const s = D.stats; if (!s || !s.n) { metrics.innerHTML = ""; return; }
-    const row = (l, v) => '<div class="m"><span>' + esc(l) + '</span><b>' + esc(v) + '</b></div>';
-    const top = (s.topEffects || []).slice(0, 4).map((e) => row(e[0], e[1])).join("");
-    metrics.innerHTML =
-      row("Interactions", s.n) +
-      row("Rate", s.ipm + " / min") +
-      row("Centroid", (s.centroid || []).join("  ")) +
-      row("Extent", (s.extent || []).join("  ")) +
-      '<div class="mt">Top effectors</div>' + top;
+  function drawDist(p) {
+    if (!DIST || !DIST.w) return;
+    const ctx = DIST.ctx, w = DIST.w, h = DIST.h; ctx.clearRect(0, 0, w, h);
+    const curFx = D.pts[headIndex(p)].fx;
+    const rows = topEffects, maxC = Math.max(1, Math.max.apply(null, rows.map((e) => e.count)));
+    const lh = h / Math.max(1, rows.length);
+    ctx.font = "10px " + F; ctx.textBaseline = "middle"; ctx.letterSpacing = "0.3px";
+    rows.forEach((e, i) => {
+      const y = i * lh + lh / 2, bw = (e.count / maxC) * w, on = e.name === curFx;
+      ctx.fillStyle = on ? "rgba(236,240,232,0.20)" : "rgba(236,240,232,0.07)";
+      ctx.fillRect(0, y - lh * 0.30, bw, lh * 0.6);
+      ctx.fillStyle = on ? "rgba(245,248,242,0.95)" : "rgba(225,232,222,0.6)";
+      ctx.fillText(e.name, 4, y);
+      ctx.textAlign = "right"; ctx.fillStyle = "rgba(245,248,242,0.8)"; ctx.fillText(String(e.count), w - 2, y); ctx.textAlign = "left";
+    });
+    ctx.letterSpacing = "0px"; ctx.textBaseline = "alphabetic";
+  }
+
+  function drawAct(p) {
+    if (!ACT || !ACT.w) return;
+    const ctx = ACT.ctx, w = ACT.w, h = ACT.h; ctx.clearRect(0, 0, w, h);
+    const base = h - 10;
+    ctx.fillStyle = "rgba(220,228,214,0.22)";
+    for (let x = 2; x < w; x += 6) ctx.fillRect(x, base, 1, 1);
+    const bw = w / NB;
+    for (let i = 0; i < NB; i++) {
+      const bh = (buckets[i] / bucketMax) * (base - 4), tnorm = (i + 0.5) / NB, on = tnorm <= p;
+      ctx.fillStyle = on ? "rgba(236,240,232,0.85)" : "rgba(236,240,232,0.16)";
+      ctx.fillRect(i * bw + bw * 0.2, base - bh, Math.max(1, bw * 0.6), bh);
+    }
+    const px = p * w;
+    ctx.strokeStyle = "rgba(245,248,242,0.7)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, base); ctx.stroke();
+  }
+
+  function drawPlan(p) {
+    if (!PLAN || !PLAN.w) return;
+    const ctx = PLAN.ctx, w = PLAN.w, h = PLAN.h; ctx.clearRect(0, 0, w, h);
+    const W = D.world;
+    const sx = (wx) => 6 + ((wx - W.xmin) / Math.max(1e-3, W.xmax - W.xmin)) * (w - 12);
+    const sz = (wz) => 6 + ((wz - W.zmin) / Math.max(1e-3, W.zmax - W.zmin)) * (h - 12);
+    ctx.strokeStyle = "rgba(220,228,214,0.12)"; ctx.lineWidth = 1; ctx.strokeRect(4.5, 4.5, w - 9, h - 9);
+    const hi = headIndex(p);
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i <= hi; i++) { const q = D.pts[i], rec = i / Math.max(1, hi); ctx.fillStyle = "rgba(208,222,210," + (0.15 + rec * 0.5).toFixed(2) + ")"; ctx.fillRect(sx(q.wx) - 0.5, sz(q.wz) - 0.5, 1.6, 1.6); }
+    ctx.globalCompositeOperation = "source-over";
+    const head = D.pts[hi]; if (head) { const x = sx(head.wx), y = sz(head.wz); ctx.strokeStyle = "rgba(245,248,242,0.9)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.stroke(); }
+  }
+
+  function drawDial(p) {
+    if (!DIAL || !DIAL.w) return;
+    const ctx = DIAL.ctx, w = DIAL.w, h = DIAL.h; ctx.clearRect(0, 0, w, h);
+    const cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.36;
+    const rot = (performance.now() / 7000) % (Math.PI * 2);
+    ctx.strokeStyle = "rgba(220,228,214,0.25)"; ctx.lineWidth = 1;
+    for (let i = 0; i < 40; i++) { const a = rot + (i / 40) * Math.PI * 2, r0 = R + 5, r1 = R + (i % 5 === 0 ? 10 : 7); ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); ctx.stroke(); }
+    ctx.strokeStyle = "rgba(220,228,214,0.15)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = "rgba(236,240,232,0.9)"; ctx.lineWidth = 2; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2); ctx.stroke(); ctx.lineCap = "butt";
+    const hi = headIndex(p);
+    ctx.textAlign = "center"; ctx.letterSpacing = "0.5px";
+    ctx.fillStyle = "rgba(245,248,242,0.95)"; ctx.font = "500 " + Math.round(R * 0.55) + "px " + F;
+    ctx.fillText(String(hi + 1), cx, cy + R * 0.08);
+    ctx.font = "9px " + F; ctx.fillStyle = "rgba(174,191,172,0.7)"; ctx.fillText("of " + N, cx, cy + R * 0.46);
+    ctx.textAlign = "left"; ctx.letterSpacing = "0px";
+  }
+
+  function drawTL(p) {
+    if (!TL || !TL.w) return;
+    const ctx = TL.ctx, w = TL.w, h = TL.h; ctx.clearRect(0, 0, w, h);
+    const lanes = topEffects, plotW = w - LABW, lh = h / Math.max(1, lanes.length);
+    ctx.strokeStyle = "rgba(220,228,214,0.08)"; ctx.lineWidth = 1;
+    for (let i = 0; i <= 10; i++) { const x = LABW + (i / 10) * plotW; ctx.beginPath(); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, h); ctx.stroke(); }
+    ctx.textBaseline = "middle"; ctx.font = "10px " + F; ctx.letterSpacing = "0.3px";
+    lanes.forEach((e, li) => {
+      const y = li * lh + lh / 2;
+      ctx.strokeStyle = "rgba(220,228,214,0.06)"; ctx.beginPath(); ctx.moveTo(0, (li + 1) * lh - 0.5); ctx.lineTo(w, (li + 1) * lh - 0.5); ctx.stroke();
+      let laneOn = false;
+      for (const q of D.pts) {
+        if (q.fx !== e.name) continue;
+        const tn = (q.t - D.t0) / dur, x = LABW + tn * plotW, on = tn <= p;
+        if (on && Math.abs(tn - p) < 0.025) laneOn = true;
+        ctx.fillStyle = on ? "rgba(236,240,232,0.85)" : "rgba(236,240,232,0.16)";
+        ctx.fillRect(x - 1, y - lh * 0.26, 2, lh * 0.52);
+      }
+      ctx.fillStyle = laneOn ? "rgba(245,248,242,0.95)" : "rgba(190,200,186,0.55)";
+      ctx.fillText(e.name, 4, y);
+    });
+    ctx.letterSpacing = "0px"; ctx.textBaseline = "alphabetic";
+    if (playheadEl) playheadEl.style.left = (LABW + p * plotW) + "px";
   }
 
   let progress = 0, playing = true, last = 0;
-  const SECS = Math.min(20, Math.max(8, D.dur || 10));
+  const SECS = clamp(dur, 8, 20);
+
+  function renderAll(p) {
+    progress = p;
+    const head = drawCentral(p);
+    drawDist(p); drawAct(p); drawPlan(p); drawDial(p); drawTL(p);
+    if (rd) rd.textContent = "PT " + clamp(Math.floor(p * N), 1, N) + " / " + N +
+      "   T+" + fmtT((head ? head.t : D.t0) - D.t0) + (head && head.fx ? ("   " + head.fx) : "");
+  }
+  function layoutAll() { [C, DIST, ACT, PLAN, DIAL, TL].forEach(fit); layoutStage(); }
+
   function loop(ts) {
     if (!last) last = ts;
     const dt = (ts - last) / 1000; last = ts;
-    if (playing) { progress += dt / SECS; if (progress >= 1) progress = 0; sc.value = Math.round(progress * 1000); }
-    render(progress);
+    if (playing) { progress += dt / SECS; if (progress >= 1) progress = 0; }
+    renderAll(progress);
     requestAnimationFrame(loop);
   }
-  pp.addEventListener("click", () => { playing = !playing; pp.textContent = playing ? "❚❚" : "▶"; });
-  sc.addEventListener("input", () => { playing = false; pp.textContent = "▶"; progress = sc.value / 1000; render(progress); });
-  window.addEventListener("resize", () => { layout(); render(progress); });
-  layout(); fillMetrics();
-  if (bgImg) bgImg.onload = () => render(progress);
+
+  if (pp) pp.addEventListener("click", () => { playing = !playing; pp.textContent = playing ? "❚❚" : "▶"; });
+  const scrub = $("scrub");
+  if (scrub) {
+    let drag = false;
+    const pAt = (clientX) => { const r = TL.cv.getBoundingClientRect(); return clamp((clientX - r.left - LABW) / Math.max(1, r.width - LABW), 0, 1); };
+    scrub.addEventListener("pointerdown", (e) => { drag = true; scrub.setPointerCapture(e.pointerId); playing = false; if (pp) pp.textContent = "▶"; progress = pAt(e.clientX); });
+    scrub.addEventListener("pointermove", (e) => { if (drag) progress = pAt(e.clientX); });
+    scrub.addEventListener("pointerup", () => { drag = false; });
+    scrub.addEventListener("pointercancel", () => { drag = false; });
+  }
+  window.addEventListener("resize", layoutAll);
+
+  (function metricsFill() {
+    const m = $("metrics"); if (!m) return;
+    const s = D.stats, row = (l, v) => '<div class="m"><span>' + l + '</span><b>' + v + '</b></div>';
+    m.innerHTML = row("Interactions", s.n) + row("Rate", s.ipm + " / min") +
+      row("Centroid", (s.centroid || []).join("  ")) + row("Extent", (s.extent || []).join("  "));
+  })();
+
+  layoutAll();
   requestAnimationFrame(loop);
 }
 
 function trajectoryHTML(json) {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>PlaySplat — Interaction Trajectory</title>
+<title>PlaySplat — Interaction Dashboard</title>
 <style>
   html,body{margin:0;height:100%;background:#05070a;color:#e6ebe2;
-    font:13px "Helvetica Neue","Inter",Arial,sans-serif;font-weight:300;overflow:hidden}
-  #c{position:fixed;inset:0;width:100vw;height:100vh;display:block}
-  .hud{position:fixed;pointer-events:none}
-  .tl{top:24px;left:24px}
-  .ttl{font-size:15px;font-weight:500;color:#f4f6f0;letter-spacing:.22em}
-  .ttl span{font-weight:300;opacity:.55}
-  .sub{margin-top:5px;font-size:9.5px;color:#aebfac;opacity:.6;text-transform:uppercase;letter-spacing:.2em}
-  #metrics{margin:16px 0 0;min-width:224px;font-size:11px;letter-spacing:.04em}
-  #metrics .m{display:flex;justify-content:space-between;gap:24px;line-height:1.85}
-  #metrics .m span{color:#c4d0c0;opacity:.55}
-  #metrics .m b{font-weight:500;color:#eef2ea}
-  #metrics .mt{margin-top:10px;color:#aebfac;opacity:.6;text-transform:uppercase;letter-spacing:.16em;font-size:9.5px}
-  .bar{position:fixed;left:24px;right:24px;bottom:20px;display:flex;align-items:center;gap:16px}
-  #pp{background:transparent;color:#e6ebe2;border:1px solid rgba(220,228,214,.34);
-    font:inherit;letter-spacing:.14em;padding:7px 15px;cursor:pointer}
+    font:12px "Helvetica Neue","Inter",Arial,sans-serif;font-weight:300;overflow:hidden;
+    font-variant-numeric:tabular-nums}
+  *{box-sizing:border-box}
+  .dash{display:grid;grid-template-columns:248px 1fr 248px;grid-template-rows:1fr 176px;
+    gap:14px;height:100vh;padding:16px}
+  .col{display:flex;flex-direction:column;gap:12px;min-height:0}
+  .left{grid-column:1;grid-row:1}
+  .stagewrap{grid-column:2;grid-row:1;position:relative;min-height:0;border:1px solid rgba(220,228,214,.12)}
+  .right{grid-column:3;grid-row:1}
+  .tlwrap{grid-column:1 / -1;grid-row:2;display:flex;flex-direction:column;gap:8px;min-height:0}
+  #c{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .brand{font-size:14px;font-weight:500;color:#f4f6f0;letter-spacing:.2em}
+  .brand span{font-weight:300;opacity:.55;font-size:11.5px;letter-spacing:.1em}
+  .sub{margin-top:5px;font-size:9px;color:#aebfac;opacity:.6;text-transform:uppercase;letter-spacing:.18em}
+  .metrics{margin-top:12px;font-size:11px}
+  .metrics .m{display:flex;justify-content:space-between;gap:18px;line-height:1.95}
+  .metrics .m span{color:#c4d0c0;opacity:.55}
+  .metrics .m b{font-weight:500;color:#eef2ea}
+  .panel{border:1px solid rgba(220,228,214,.16);padding:10px;display:flex;flex-direction:column;min-height:0;flex:1}
+  .panel h3{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#aebfac;font-weight:500;margin:0 0 6px}
+  .panel canvas{flex:1;width:100%;min-height:0;display:block}
+  .tl{position:relative;flex:1;border:1px solid rgba(220,228,214,.16);min-height:0}
+  .tl canvas{width:100%;height:100%;display:block}
+  .ph{position:absolute;top:0;bottom:0;width:1px;background:#eef2ea;left:96px;pointer-events:none;box-shadow:0 0 6px rgba(238,242,234,.5)}
+  .scrub{position:absolute;inset:0;cursor:ew-resize}
+  .bar{display:flex;align-items:center;gap:16px}
+  #pp{background:transparent;color:#e6ebe2;border:1px solid rgba(220,228,214,.34);font:inherit;
+    letter-spacing:.14em;padding:7px 15px;cursor:pointer}
   #pp:hover{background:#e6ebe2;color:#05070a}
-  #sc{flex:1;accent-color:#cdd8c8;height:2px}
-  #rd{min-width:210px;text-align:right;color:#cdd8c8;letter-spacing:.14em;font-size:11px}
+  #rd{color:#cdd8c8;letter-spacing:.12em;font-size:11px}
+  @media(max-width:900px){.dash{grid-template-columns:1fr;grid-template-rows:1fr 150px}
+    .left,.right{display:none}.stagewrap{grid-column:1}.tlwrap{grid-column:1}}
 </style></head>
 <body>
-  <canvas id="c"></canvas>
-  <div class="hud tl">
-    <div class="ttl">PLAYSPLAT&nbsp;&nbsp;<span>Interaction Trajectory</span></div>
-    <div class="sub">operational image · collective trace</div>
-    <div id="metrics"></div>
-  </div>
-  <div class="bar">
-    <button id="pp">❚❚</button>
-    <input id="sc" type="range" min="0" max="1000" value="0"/>
-    <div id="rd">—</div>
+  <div class="dash">
+    <aside class="col left">
+      <div>
+        <div class="brand">PLAYSPLAT&nbsp;&nbsp;<span>Interaction Dashboard</span></div>
+        <div class="sub">operational image · collective trace</div>
+        <div id="metrics" class="metrics"></div>
+      </div>
+      <div class="panel"><h3>Effect distribution</h3><canvas id="dist"></canvas></div>
+    </aside>
+    <main class="stagewrap"><canvas id="c"></canvas></main>
+    <aside class="col right">
+      <div class="panel"><h3>Activity / time</h3><canvas id="act"></canvas></div>
+      <div class="panel"><h3>Plan view · XZ</h3><canvas id="plan"></canvas></div>
+      <div class="panel"><h3>Progress</h3><canvas id="dial"></canvas></div>
+    </aside>
+    <footer class="tlwrap">
+      <div class="tl"><canvas id="tl"></canvas><div id="playhead" class="ph"></div><div id="scrub" class="scrub"></div></div>
+      <div class="bar"><button id="pp">❚❚</button><div id="rd">—</div></div>
+    </footer>
   </div>
   <script>window.__TRAJ__=${json};(${_trajViewer.toString()})();</script>
 </body></html>`;
