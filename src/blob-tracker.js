@@ -21,6 +21,10 @@ import * as THREE from "three";
 // selectable label mode; the default is now a real monotonic track id.
 const labelFor = (id) => (id / 7).toFixed(4);
 
+// Exports use a clean sans (never a monospace) so the overlay reads as a
+// refined data-graphic that sits inside the scene rather than a terminal HUD.
+const SANS = '"Helvetica Neue", "Inter", Arial, sans-serif';
+
 export class BlobTracker {
   /**
    * @param {object} opts
@@ -356,48 +360,50 @@ export class BlobTracker {
       } catch (e) { /* tainted/empty */ }
     }
 
-    // 2) Density bloom — additive cool halos with warm cores; overlaps glow
-    //    hotter toward white, so density reads without a clinical ramp.
+    // 2) Density bloom — a single soft, sage-white halo per touch, low alpha,
+    //    so density reads as a quiet luminance that belongs to the scene
+    //    rather than a saturated blue/orange overlay.
     ctx.globalCompositeOperation = "lighter";
-    const R = Math.max(36, Math.min(W, H) * 0.05);
+    const R = Math.max(26, Math.min(W, H) * 0.038);
     for (const p of pts) {
       const x = X(p), y = Y(p);
-      let g = ctx.createRadialGradient(x, y, 0, x, y, R);
-      g.addColorStop(0, "rgba(90,150,170,0.20)"); g.addColorStop(1, "rgba(40,90,120,0)");
+      const g = ctx.createRadialGradient(x, y, 0, x, y, R);
+      g.addColorStop(0, "rgba(208,222,210,0.09)"); g.addColorStop(1, "rgba(208,222,210,0)");
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill();
-      g = ctx.createRadialGradient(x, y, 0, x, y, R * 0.34);
-      g.addColorStop(0, "rgba(240,180,90,0.16)"); g.addColorStop(1, "rgba(240,180,90,0)");
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, R * 0.34, 0, 7); ctx.fill();
     }
 
-    // 3) Trajectory — glowing routes between consecutive touches in time,
-    //    a comet trail brightening toward the most recent interaction.
+    // 3) Trajectory — delicate filaments between consecutive touches in time,
+    //    near-white at low opacity, barely brightening toward the most recent.
+    //    Hairline weight + faint glow so the web recedes into the field.
     ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.shadowColor = "rgba(150,210,230,0.9)"; ctx.shadowBlur = 6 * S;
+    ctx.shadowColor = "rgba(225,235,225,0.45)"; ctx.shadowBlur = 1.5 * S;
     for (let i = 1; i < pts.length; i++) {
       const a = pts[i - 1], b = pts[i], rec = i / pts.length;
-      ctx.strokeStyle = `rgba(190,230,245,${(0.10 + rec * 0.5).toFixed(3)})`;
-      ctx.lineWidth = (0.6 + rec * 1.4) * S;
+      ctx.strokeStyle = `rgba(236,240,232,${(0.06 + rec * 0.16).toFixed(3)})`;
+      ctx.lineWidth = (0.4 + rec * 0.55) * S;
       ctx.beginPath(); ctx.moveTo(X(a), Y(a)); ctx.lineTo(X(b), Y(b)); ctx.stroke();
     }
     ctx.shadowBlur = 0;
     ctx.globalCompositeOperation = "source-over";
 
-    // 4) Nodes — bright points; every Nth gets a framed telemetry label.
-    const step = Math.max(1, Math.round(pts.length / 22));
-    ctx.font = `${10 * S}px ui-monospace, 'SF Mono', Menlo, monospace`;
+    // 4) Nodes — small soft points; every Nth gets a light reticle + a bare
+    //    numeric tag set in sans, scattered like the reference field labels.
+    const step = Math.max(1, Math.round(pts.length / 18));
     ctx.textBaseline = "alphabetic";
+    ctx.letterSpacing = `${1 * S}px`;
+    ctx.font = `${9 * S}px ${SANS}`;
     pts.forEach((p, i) => {
       const x = X(p), y = Y(p);
-      ctx.fillStyle = "rgba(255,255,255,0.9)";
-      ctx.beginPath(); ctx.arc(x, y, 1.6 * S, 0, 7); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.72)";
+      ctx.beginPath(); ctx.arc(x, y, 1.3 * S, 0, 7); ctx.fill();
       if (i % step === 0) {
-        ctx.strokeStyle = "rgba(190,230,245,0.5)"; ctx.lineWidth = 1 * S;
-        ctx.strokeRect(x - 5 * S, y - 5 * S, 10 * S, 10 * S);
-        ctx.fillStyle = "rgba(200,235,250,0.8)";
-        ctx.fillText(`#${String(p.track).padStart(3, "0")}`, x + 9 * S, y + 4 * S);
+        ctx.strokeStyle = "rgba(224,232,220,0.3)"; ctx.lineWidth = 1 * S;
+        ctx.strokeRect(x - 4 * S, y - 4 * S, 8 * S, 8 * S);
+        ctx.fillStyle = "rgba(232,238,228,0.6)";
+        ctx.fillText(String(p.track).padStart(3, "0"), x + 8 * S, y + 3.5 * S);
       }
     });
+    ctx.letterSpacing = "0px";
 
     // 5) Telemetry HUD — framed corner data blocks.
     this._drawFieldHUD(ctx, S, W, H, pts.length);
@@ -414,57 +420,72 @@ export class BlobTracker {
     window.__toast?.(`Field exported — ${pts.length} interactions`);
   }
 
-  // Framed corner data panels for the PNG export (title, timestamp, metrics,
-  // top effectors), in the instrument-readout register of the references.
+  // Corner data panels for the PNG export, set in a light sans with generous
+  // tracking and two-column label/value rows — a quiet readout, not a HUD.
   _drawFieldHUD(ctx, S, W, H, plotted) {
     const st = this._sessionStats();
-    const pad = 18 * S, lh = 15 * S, padIn = 9 * S;
-    const mono = (px) => `${px * S}px ui-monospace, 'SF Mono', Menlo, monospace`;
+    const pad = 22 * S, lh = 16 * S, padIn = 11 * S, gap = 16 * S;
+    const font = (px, w) => `${w || 400} ${px * S}px ${SANS}`;
     ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
 
-    ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.font = mono(15);
-    ctx.fillText("PLAYSPLAT // INTERACTION FIELD", pad, pad + 14 * S);
-    ctx.fillStyle = "rgba(170,210,225,0.7)"; ctx.font = mono(10);
-    ctx.fillText("OPERATIONAL IMAGE · COLLECTIVE TRACE", pad, pad + 30 * S);
+    // masthead — weighted name + light qualifier on one line
+    ctx.letterSpacing = `${2.5 * S}px`;
+    ctx.fillStyle = "rgba(245,246,242,0.9)"; ctx.font = font(15, 500);
+    ctx.fillText("PLAYSPLAT", pad, pad + 13 * S);
+    const tw = ctx.measureText("PLAYSPLAT ").width;
+    ctx.font = font(15, 300); ctx.fillStyle = "rgba(245,246,242,0.5)";
+    ctx.fillText("INTERACTION FIELD", pad + tw, pad + 13 * S);
+    ctx.letterSpacing = `${1.5 * S}px`;
+    ctx.fillStyle = "rgba(210,220,210,0.42)"; ctx.font = font(9.5, 400);
+    ctx.fillText("OPERATIONAL IMAGE · COLLECTIVE TRACE", pad, pad + 29 * S);
 
     const stamp = new Date().toISOString().replace("T", " ").slice(0, 19);
     ctx.textAlign = "right";
-    ctx.fillText(stamp, W - pad, pad + 14 * S);
+    ctx.fillText(stamp, W - pad, pad + 13 * S);
     ctx.textAlign = "left";
+    ctx.letterSpacing = "0px";
     if (!st.n) return;
 
-    const panel = (x, y, title, lines) => {
-      ctx.font = mono(10);
-      let wmax = ctx.measureText(title).width;
-      for (const l of lines) wmax = Math.max(wmax, ctx.measureText(l).width);
-      const w = wmax + padIn * 2, h = (lines.length + 1) * lh + padIn * 1.2;
-      ctx.fillStyle = "rgba(6,10,14,0.55)"; ctx.fillRect(x, y, w, h);
-      ctx.strokeStyle = "rgba(150,200,220,0.45)"; ctx.lineWidth = 1 * S; ctx.strokeRect(x, y, w, h);
-      ctx.fillStyle = "rgba(150,200,220,0.85)"; ctx.fillText(title, x + padIn, y + padIn + 10 * S);
-      ctx.fillStyle = "rgba(225,238,245,0.85)";
-      lines.forEach((l, i) => ctx.fillText(l, x + padIn, y + padIn + (i + 2) * lh));
-      return { w, h };
+    const panel = (anchorX, y, title, rows, right) => {
+      ctx.letterSpacing = `${1.5 * S}px`; ctx.font = font(9.5, 500);
+      let labelW = ctx.measureText(title).width;
+      ctx.letterSpacing = `${0.5 * S}px`; ctx.font = font(10, 400);
+      let valW = 0;
+      for (const [l, v] of rows) {
+        labelW = Math.max(labelW, ctx.measureText(l).width);
+        valW = Math.max(valW, ctx.measureText(String(v)).width);
+      }
+      const w = padIn * 2 + labelW + gap + valW;
+      const h = (rows.length + 1) * lh + padIn * 1.4;
+      const x = right ? anchorX - w : anchorX;
+      ctx.fillStyle = "rgba(8,12,12,0.34)"; ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = "rgba(220,228,218,0.2)"; ctx.lineWidth = 1 * S; ctx.strokeRect(x, y, w, h);
+      ctx.letterSpacing = `${1.5 * S}px`; ctx.font = font(9.5, 500);
+      ctx.fillStyle = "rgba(220,228,214,0.68)"; ctx.fillText(title, x + padIn, y + padIn + 9 * S);
+      ctx.letterSpacing = `${0.5 * S}px`; ctx.font = font(10, 400);
+      rows.forEach(([l, v], i) => {
+        const ry = y + padIn + (i + 2) * lh;
+        ctx.fillStyle = "rgba(225,232,222,0.48)"; ctx.fillText(l, x + padIn, ry);
+        ctx.fillStyle = "rgba(245,248,242,0.8)"; ctx.fillText(String(v), x + padIn + labelW + gap, ry);
+      });
+      ctx.letterSpacing = "0px";
     };
 
     const f2 = (v) => v.toFixed(2);
     const metrics = [
-      `INTERACTIONS   ${st.n}`,
-      `DURATION       ${this._fmtTime(st.dur)}`,
-      `RATE           ${st.ipm.toFixed(1)} / min`,
-      `CENTROID       ${st.centroid.map(f2).join("  ")}`,
-      `EXTENT         ${st.extent.map(f2).join("  ")}`,
+      ["Interactions", st.n],
+      ["Duration", this._fmtTime(st.dur)],
+      ["Rate", `${st.ipm.toFixed(1)} / min`],
+      ["Centroid", st.centroid.map(f2).join("  ")],
+      ["Extent", st.extent.map(f2).join("  ")],
     ];
-    const mh = (metrics.length + 1) * lh + padIn * 1.2;
-    panel(pad, H - pad - mh, "FIELD METRICS", metrics);
+    const mh = (metrics.length + 1) * lh + padIn * 1.4;
+    panel(pad, H - pad - mh, "FIELD METRICS", metrics, false);
 
-    const fx = st.topEffects.map(([e, c]) => `${(e || "").slice(0, 14).padEnd(14)} ${String(c).padStart(4)}`);
+    const fx = st.topEffects.map(([e, c]) => [e || "—", c]);
     if (fx.length) {
-      ctx.font = mono(10);
-      let fw = ctx.measureText("TOP EFFECTORS").width;
-      for (const l of fx) fw = Math.max(fw, ctx.measureText(l).width);
-      fw += padIn * 2;
-      const fh = (fx.length + 1) * lh + padIn * 1.2;
-      panel(W - pad - fw, H - pad - fh, "TOP EFFECTORS", fx);
+      const fh = (fx.length + 1) * lh + padIn * 1.4;
+      panel(W - pad, H - pad - fh, "TOP EFFECTORS", fx, true);
     }
   }
 
@@ -590,6 +611,8 @@ function _trajViewer() {
   const cv = document.getElementById("c"), ctx = cv.getContext("2d");
   const pp = document.getElementById("pp"), sc = document.getElementById("sc");
   const rd = document.getElementById("rd"), metrics = document.getElementById("metrics");
+  const F = '"Helvetica Neue", "Inter", Arial, sans-serif';
+  const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
   let vw = 0, vh = 0, dpr = 1, stage = { x: 0, y: 0, w: 0, h: 0 };
   let bgImg = null;
   if (D.bg) { bgImg = new Image(); bgImg.src = D.bg; }
@@ -614,52 +637,54 @@ function _trajViewer() {
     if (bgImg && bgImg.complete && bgImg.naturalWidth) ctx.drawImage(bgImg, stage.x, stage.y, stage.w, stage.h);
 
     ctx.globalCompositeOperation = "lighter";
-    // ghost of the full path
-    ctx.strokeStyle = "rgba(120,170,190,0.05)"; ctx.lineWidth = 1;
+    // ghost of the full path — a faint neutral thread
+    ctx.strokeStyle = "rgba(150,170,150,0.045)"; ctx.lineWidth = 1;
     ctx.beginPath();
     for (let i = 0; i < N; i++) { const p = D.pts[i], x = SX(p.x), y = SY(p.y); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
     ctx.stroke();
-    // blooms for recent points
+    // soft sage-white blooms for recent points
     for (let i = Math.max(0, count - 60); i < count; i++) {
       const p = D.pts[i], x = SX(p.x), y = SY(p.y);
-      const g = ctx.createRadialGradient(x, y, 0, x, y, 46);
-      g.addColorStop(0, "rgba(90,150,170,0.16)"); g.addColorStop(1, "rgba(40,90,120,0)");
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 46, 0, 7); ctx.fill();
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 38);
+      g.addColorStop(0, "rgba(208,222,210,0.10)"); g.addColorStop(1, "rgba(208,222,210,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 38, 0, 7); ctx.fill();
     }
-    // comet trajectory
-    ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.shadowColor = "rgba(150,210,230,0.9)";
+    // delicate filament trajectory
+    ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.shadowColor = "rgba(225,235,225,0.5)";
     for (let i = 1; i < count; i++) {
       const a = D.pts[i - 1], b = D.pts[i], rec = i / count;
-      ctx.shadowBlur = 5;
-      ctx.strokeStyle = "rgba(190,230,245," + (0.07 + rec * 0.5).toFixed(3) + ")";
-      ctx.lineWidth = 0.8 + rec * 1.7;
+      ctx.shadowBlur = 2;
+      ctx.strokeStyle = "rgba(236,240,232," + (0.06 + rec * 0.2).toFixed(3) + ")";
+      ctx.lineWidth = 0.5 + rec * 0.7;
       ctx.beginPath(); ctx.moveTo(SX(a.x), SY(a.y)); ctx.lineTo(SX(b.x), SY(b.y)); ctx.stroke();
     }
     ctx.shadowBlur = 0; ctx.globalCompositeOperation = "source-over";
     // nodes
-    for (let i = 0; i < count; i++) { const p = D.pts[i]; ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.beginPath(); ctx.arc(SX(p.x), SY(p.y), 1.7, 0, 7); ctx.fill(); }
+    for (let i = 0; i < count; i++) { const p = D.pts[i]; ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.beginPath(); ctx.arc(SX(p.x), SY(p.y), 1.4, 0, 7); ctx.fill(); }
     // head reticle
     const head = D.pts[count - 1], hx = SX(head.x), hy = SY(head.y);
-    ctx.strokeStyle = "rgba(200,235,250,0.9)"; ctx.lineWidth = 1;
-    ctx.strokeRect(hx - 7, hy - 7, 14, 14);
+    ctx.strokeStyle = "rgba(232,238,228,0.85)"; ctx.lineWidth = 1;
+    ctx.strokeRect(hx - 6, hy - 6, 12, 12);
     ctx.beginPath();
-    ctx.moveTo(hx - 12, hy); ctx.lineTo(hx - 8, hy); ctx.moveTo(hx + 8, hy); ctx.lineTo(hx + 12, hy);
-    ctx.moveTo(hx, hy - 12); ctx.lineTo(hx, hy - 8); ctx.moveTo(hx, hy + 8); ctx.lineTo(hx, hy + 12); ctx.stroke();
-    ctx.font = "10px ui-monospace,Menlo,monospace"; ctx.fillStyle = "rgba(200,235,250,0.9)";
-    ctx.fillText("#" + String(head.track).padStart(3, "0") + (head.fx ? ("  " + head.fx) : ""), hx + 11, hy + 4);
+    ctx.moveTo(hx - 11, hy); ctx.lineTo(hx - 8, hy); ctx.moveTo(hx + 8, hy); ctx.lineTo(hx + 11, hy);
+    ctx.moveTo(hx, hy - 11); ctx.lineTo(hx, hy - 8); ctx.moveTo(hx, hy + 8); ctx.lineTo(hx, hy + 11); ctx.stroke();
+    ctx.letterSpacing = "1px"; ctx.font = "10px " + F; ctx.fillStyle = "rgba(232,238,228,0.85)";
+    ctx.fillText(String(head.track).padStart(3, "0") + (head.fx ? ("  " + head.fx) : ""), hx + 10, hy + 3.5);
+    ctx.letterSpacing = "0px";
 
     rd.textContent = "PT " + count + " / " + N + "   T+" + fmtT(head.t - D.t0);
   }
 
   function fillMetrics() {
-    const s = D.stats; if (!s || !s.n) { metrics.textContent = ""; return; }
-    const top = (s.topEffects || []).slice(0, 4).map((e) => "  " + String(e[0]).slice(0, 16).padEnd(16) + " " + e[1]).join("\n");
-    metrics.textContent =
-      "INTERACTIONS  " + s.n + "\n" +
-      "RATE          " + s.ipm + " / min\n" +
-      "CENTROID      " + (s.centroid || []).join("  ") + "\n" +
-      "EXTENT        " + (s.extent || []).join("  ") + "\n" +
-      "TOP EFFECTORS\n" + top;
+    const s = D.stats; if (!s || !s.n) { metrics.innerHTML = ""; return; }
+    const row = (l, v) => '<div class="m"><span>' + esc(l) + '</span><b>' + esc(v) + '</b></div>';
+    const top = (s.topEffects || []).slice(0, 4).map((e) => row(e[0], e[1])).join("");
+    metrics.innerHTML =
+      row("Interactions", s.n) +
+      row("Rate", s.ipm + " / min") +
+      row("Centroid", (s.centroid || []).join("  ")) +
+      row("Extent", (s.extent || []).join("  ")) +
+      '<div class="mt">Top effectors</div>' + top;
   }
 
   let progress = 0, playing = true, last = 0;
@@ -684,27 +709,32 @@ function trajectoryHTML(json) {
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>PlaySplat — Interaction Trajectory</title>
 <style>
-  html,body{margin:0;height:100%;background:#05070a;color:#dfeaf0;
-    font:12px ui-monospace,'SF Mono',Menlo,Consolas,monospace;overflow:hidden}
+  html,body{margin:0;height:100%;background:#05070a;color:#e6ebe2;
+    font:13px "Helvetica Neue","Inter",Arial,sans-serif;font-weight:300;overflow:hidden}
   #c{position:fixed;inset:0;width:100vw;height:100vh;display:block}
-  .hud{position:fixed;pointer-events:none;letter-spacing:.08em}
-  .tl{top:18px;left:18px}
-  .ttl{font-size:14px;color:#fff;letter-spacing:.14em}
-  .sub{margin-top:4px;font-size:10px;color:#9fd;opacity:.6;text-transform:uppercase;letter-spacing:.16em}
-  #metrics{margin:14px 0 0;color:#bfe;opacity:.82;line-height:1.75;font-size:11px;white-space:pre}
-  .bar{position:fixed;left:18px;right:18px;bottom:16px;display:flex;align-items:center;gap:14px}
-  #pp{background:transparent;color:#dfeaf0;border:1px solid rgba(150,200,220,.5);
-    font:inherit;letter-spacing:.12em;padding:7px 13px;cursor:pointer}
-  #pp:hover{background:#dfeaf0;color:#05070a}
-  #sc{flex:1;accent-color:#9fd;height:2px}
-  #rd{min-width:220px;text-align:right;color:#bfe;letter-spacing:.12em}
+  .hud{position:fixed;pointer-events:none}
+  .tl{top:24px;left:24px}
+  .ttl{font-size:15px;font-weight:500;color:#f4f6f0;letter-spacing:.22em}
+  .ttl span{font-weight:300;opacity:.55}
+  .sub{margin-top:5px;font-size:9.5px;color:#aebfac;opacity:.6;text-transform:uppercase;letter-spacing:.2em}
+  #metrics{margin:16px 0 0;min-width:224px;font-size:11px;letter-spacing:.04em}
+  #metrics .m{display:flex;justify-content:space-between;gap:24px;line-height:1.85}
+  #metrics .m span{color:#c4d0c0;opacity:.55}
+  #metrics .m b{font-weight:500;color:#eef2ea}
+  #metrics .mt{margin-top:10px;color:#aebfac;opacity:.6;text-transform:uppercase;letter-spacing:.16em;font-size:9.5px}
+  .bar{position:fixed;left:24px;right:24px;bottom:20px;display:flex;align-items:center;gap:16px}
+  #pp{background:transparent;color:#e6ebe2;border:1px solid rgba(220,228,214,.34);
+    font:inherit;letter-spacing:.14em;padding:7px 15px;cursor:pointer}
+  #pp:hover{background:#e6ebe2;color:#05070a}
+  #sc{flex:1;accent-color:#cdd8c8;height:2px}
+  #rd{min-width:210px;text-align:right;color:#cdd8c8;letter-spacing:.14em;font-size:11px}
 </style></head>
 <body>
   <canvas id="c"></canvas>
   <div class="hud tl">
-    <div class="ttl">PLAYSPLAT // INTERACTION TRAJECTORY</div>
+    <div class="ttl">PLAYSPLAT&nbsp;&nbsp;<span>Interaction Trajectory</span></div>
     <div class="sub">operational image · collective trace</div>
-    <pre id="metrics"></pre>
+    <div id="metrics"></div>
   </div>
   <div class="bar">
     <button id="pp">❚❚</button>
