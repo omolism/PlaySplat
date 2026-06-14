@@ -644,274 +644,184 @@ function _trajViewer() {
   const N = D.pts.length;
   const dur = D.dur || 1;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const pad3 = (n) => String(n).padStart(3, "0");
   const fmtT = (s) => { s = Math.max(0, s | 0); const m = (s / 60) | 0, ss = s % 60; return (m < 10 ? "0" : "") + m + ":" + (ss < 10 ? "0" : "") + ss; };
 
-  function mk(id) { const cv = $(id); if (!cv) return null; return { cv, ctx: cv.getContext("2d"), w: 0, h: 0 }; }
-  function fit(c) {
-    if (!c) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const r = c.cv.getBoundingClientRect();
-    c.w = Math.max(1, r.width); c.h = Math.max(1, r.height);
-    c.cv.width = Math.round(c.w * dpr); c.cv.height = Math.round(c.h * dpr);
-    c.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-
-  const C = mk("c"), DIST = mk("dist"), ACT = mk("act"), PLAN = mk("plan"), DIAL = mk("dial"), TL = mk("tl");
-  const playheadEl = $("playhead"), rd = $("rd"), pp = $("pp");
-  const LABW = 96;
-
+  const cv = $("c"), ctx = cv.getContext("2d");
+  const pp = $("pp"), scrub = $("scrub");
+  let vw = 0, vh = 0, dpr = 1;
   let bgImg = null;
-  if (D.bg) { bgImg = new Image(); bgImg.src = D.bg; bgImg.onload = () => renderAll(progress); }
+  if (D.bg) { bgImg = new Image(); bgImg.src = D.bg; bgImg.onload = () => render(progress); }
 
   const topEffects = D.effects.slice(0, 6);
+  const headIndex = (p) => clamp(Math.floor(p * N), 1, N) - 1;
+  const pad = 26, TLH = 96, GUT = 116, TLBOT = 52;   // timeline + scrub geometry
 
-  const NB = 30;
-  const buckets = new Array(NB).fill(0);
-  for (const p of D.pts) { const b = clamp(Math.floor(((p.t - D.t0) / dur) * NB), 0, NB - 1); buckets[b]++; }
-  const bucketMax = Math.max(1, Math.max.apply(null, buckets));
+  function halo(a, b) { ctx.shadowColor = "rgba(0,0,0," + a + ")"; ctx.shadowBlur = b; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; }
+  function noHalo() { ctx.shadowBlur = 0; }
 
-  // central stage (contain the trajectory aspect inside the #c canvas)
-  let stage = { x: 0, y: 0, w: 0, h: 0 };
-  function layoutStage() {
-    let w = C.w, h = C.w / D.aspect;
-    if (h > C.h) { h = C.h; w = C.h * D.aspect; }
-    stage = { x: (C.w - w) / 2, y: (C.h - h) / 2, w, h };
+  function layout() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    vw = window.innerWidth; vh = window.innerHeight;
+    cv.width = vw * dpr; cv.height = vh * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  const SX = (nx) => stage.x + nx * stage.w, SY = (ny) => stage.y + ny * stage.h;
-  const headIndex = (p) => clamp(Math.floor(p * N), 1, N) - 1;   // matches the central head point
+  // cover the viewport with the source aspect — no letterbox, so no black bars
+  function cover() {
+    let w = vw, h = vw / D.aspect;
+    if (h < vh) { h = vh; w = vh * D.aspect; }
+    return { x: (vw - w) / 2, y: (vh - h) / 2, w, h };
+  }
 
-  function drawCentral(p) {
-    if (!C.w) return null;
-    const ctx = C.ctx, count = clamp(Math.floor(p * N), 1, N);
-    ctx.clearRect(0, 0, C.w, C.h);
-    ctx.fillStyle = "#06080a"; ctx.fillRect(0, 0, C.w, C.h);
-    if (bgImg && bgImg.complete && bgImg.naturalWidth) ctx.drawImage(bgImg, stage.x, stage.y, stage.w, stage.h);
-    ctx.strokeStyle = "rgba(220,228,214,0.12)"; ctx.lineWidth = 1; ctx.strokeRect(0.5, 0.5, C.w - 1, C.h - 1);
-    ctx.globalCompositeOperation = "lighter";
-    ctx.strokeStyle = "rgba(150,170,150,0.045)"; ctx.lineWidth = 1; ctx.beginPath();
-    for (let i = 0; i < N; i++) { const q = D.pts[i]; i ? ctx.lineTo(SX(q.x), SY(q.y)) : ctx.moveTo(SX(q.x), SY(q.y)); }
-    ctx.stroke();
-    for (let i = Math.max(0, count - 50); i < count; i++) {
-      const q = D.pts[i], x = SX(q.x), y = SY(q.y);
-      const g = ctx.createRadialGradient(x, y, 0, x, y, 34);
-      g.addColorStop(0, "rgba(208,222,210,0.10)"); g.addColorStop(1, "rgba(208,222,210,0)");
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 34, 0, 7); ctx.fill();
-    }
-    ctx.lineCap = "round"; ctx.shadowColor = "rgba(225,235,225,0.5)";
+  function render(p) {
+    if (!vw) return;
+    const st = cover();
+    const SX = (nx) => st.x + nx * st.w, SY = (ny) => st.y + ny * st.h;
+    const count = clamp(Math.floor(p * N), 1, N);
+    const head = D.pts[headIndex(p)];
+    const curFx = head ? head.fx : "";
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, vw, vh);
+    // 1) full-bleed bright backdrop (no dark wash over the image)
+    if (bgImg && bgImg.complete && bgImg.naturalWidth) ctx.drawImage(bgImg, st.x, st.y, st.w, st.h);
+    else { ctx.fillStyle = "#0a0d10"; ctx.fillRect(0, 0, vw, vh); }
+    // 2) feathered top/bottom scrims (gradients, never hard boxes) to seat text
+    let g = ctx.createLinearGradient(0, 0, 0, 175); g.addColorStop(0, "rgba(6,8,10,0.42)"); g.addColorStop(1, "rgba(6,8,10,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, vw, 175);
+    g = ctx.createLinearGradient(0, vh - 210, 0, vh); g.addColorStop(0, "rgba(6,8,10,0)"); g.addColorStop(1, "rgba(6,8,10,0.5)");
+    ctx.fillStyle = g; ctx.fillRect(0, vh - 210, vw, 210);
+
+    // 3) trajectory + nodes + head reticle with leader annotation
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    halo(0.5, 2.5);
     for (let i = 1; i < count; i++) {
       const a = D.pts[i - 1], b = D.pts[i], rec = i / count;
-      ctx.shadowBlur = 2;
-      ctx.strokeStyle = "rgba(236,240,232," + (0.06 + rec * 0.2).toFixed(3) + ")";
-      ctx.lineWidth = 0.5 + rec * 0.7;
+      ctx.strokeStyle = "rgba(244,246,240," + (0.26 + rec * 0.5).toFixed(3) + ")";
+      ctx.lineWidth = 0.7 + rec * 1.0;
       ctx.beginPath(); ctx.moveTo(SX(a.x), SY(a.y)); ctx.lineTo(SX(b.x), SY(b.y)); ctx.stroke();
     }
-    ctx.shadowBlur = 0; ctx.globalCompositeOperation = "source-over";
-    for (let i = 0; i < count; i++) { const q = D.pts[i]; ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.beginPath(); ctx.arc(SX(q.x), SY(q.y), 1.3, 0, 7); ctx.fill(); }
-    const head = D.pts[count - 1], hx = SX(head.x), hy = SY(head.y);
-    ctx.strokeStyle = "rgba(232,238,228,0.85)"; ctx.lineWidth = 1; ctx.strokeRect(hx - 6, hy - 6, 12, 12);
-    ctx.beginPath();
-    ctx.moveTo(hx - 11, hy); ctx.lineTo(hx - 8, hy); ctx.moveTo(hx + 8, hy); ctx.lineTo(hx + 11, hy);
-    ctx.moveTo(hx, hy - 11); ctx.lineTo(hx, hy - 8); ctx.moveTo(hx, hy + 8); ctx.lineTo(hx, hy + 11); ctx.stroke();
-    ctx.letterSpacing = "1px"; ctx.font = "10px " + F; ctx.fillStyle = "rgba(232,238,228,0.85)";
-    ctx.fillText(String(head.track).padStart(3, "0") + (head.fx ? ("  " + head.fx) : ""), hx + 10, hy + 3.5);
-    ctx.letterSpacing = "0px";
-    return head;
-  }
-
-  function drawDist(p) {
-    if (!DIST || !DIST.w) return;
-    const ctx = DIST.ctx, w = DIST.w, h = DIST.h; ctx.clearRect(0, 0, w, h);
-    const curFx = D.pts[headIndex(p)].fx;
-    const rows = topEffects, maxC = Math.max(1, Math.max.apply(null, rows.map((e) => e.count)));
-    const lh = h / Math.max(1, rows.length);
-    ctx.font = "10px " + F; ctx.textBaseline = "middle"; ctx.letterSpacing = "0.3px";
-    rows.forEach((e, i) => {
-      const y = i * lh + lh / 2, bw = (e.count / maxC) * w, on = e.name === curFx;
-      ctx.fillStyle = on ? "rgba(236,240,232,0.20)" : "rgba(236,240,232,0.07)";
-      ctx.fillRect(0, y - lh * 0.30, bw, lh * 0.6);
-      ctx.fillStyle = on ? "rgba(245,248,242,0.95)" : "rgba(225,232,222,0.6)";
-      ctx.fillText(e.name, 4, y);
-      ctx.textAlign = "right"; ctx.fillStyle = "rgba(245,248,242,0.8)"; ctx.fillText(String(e.count), w - 2, y); ctx.textAlign = "left";
-    });
-    ctx.letterSpacing = "0px"; ctx.textBaseline = "alphabetic";
-  }
-
-  function drawAct(p) {
-    if (!ACT || !ACT.w) return;
-    const ctx = ACT.ctx, w = ACT.w, h = ACT.h; ctx.clearRect(0, 0, w, h);
-    const base = h - 10;
-    ctx.fillStyle = "rgba(220,228,214,0.22)";
-    for (let x = 2; x < w; x += 6) ctx.fillRect(x, base, 1, 1);
-    const bw = w / NB;
-    for (let i = 0; i < NB; i++) {
-      const bh = (buckets[i] / bucketMax) * (base - 4), tnorm = (i + 0.5) / NB, on = tnorm <= p;
-      ctx.fillStyle = on ? "rgba(236,240,232,0.85)" : "rgba(236,240,232,0.16)";
-      ctx.fillRect(i * bw + bw * 0.2, base - bh, Math.max(1, bw * 0.6), bh);
+    noHalo();
+    halo(0.5, 2);
+    for (let i = 0; i < count; i++) { const q = D.pts[i]; ctx.fillStyle = "rgba(255,255,255,0.82)"; ctx.beginPath(); ctx.arc(SX(q.x), SY(q.y), 1.6, 0, 7); ctx.fill(); }
+    noHalo();
+    if (head) {
+      const hx = SX(head.x), hy = SY(head.y);
+      halo(0.5, 2.5); ctx.strokeStyle = "rgba(232,238,228,0.9)"; ctx.lineWidth = 1;
+      ctx.strokeRect(hx - 6, hy - 6, 12, 12);
+      const ly = clamp(hy, vh * 0.24, vh * 0.62), ex = vw - pad - 150;
+      ctx.strokeStyle = "rgba(245,248,242,0.6)";
+      ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(ex, ly); ctx.lineTo(vw - pad, ly); ctx.stroke();
+      ctx.beginPath(); ctx.arc(hx, hy, 3.5, 0, 7); ctx.stroke(); noHalo();
+      ctx.textAlign = "right"; halo(0.6, 3);
+      ctx.letterSpacing = "1px"; ctx.fillStyle = "rgba(246,248,242,0.95)"; ctx.font = "500 12px " + F;
+      ctx.fillText(("#" + pad3(head.track) + "  " + (head.fx || "").toUpperCase()).trim(), vw - pad, ly - 4);
+      ctx.letterSpacing = "0.5px"; ctx.fillStyle = "rgba(214,224,212,0.72)"; ctx.font = "400 9px " + F;
+      ctx.fillText("T+" + fmtT(head.t - D.t0), vw - pad, ly + 11);
+      noHalo(); ctx.letterSpacing = "0px"; ctx.textAlign = "left";
     }
-    const px = p * w;
-    ctx.strokeStyle = "rgba(245,248,242,0.7)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, base); ctx.stroke();
-  }
 
-  function drawPlan(p) {
-    if (!PLAN || !PLAN.w) return;
-    const ctx = PLAN.ctx, w = PLAN.w, h = PLAN.h; ctx.clearRect(0, 0, w, h);
-    const W = D.world;
-    const sx = (wx) => 6 + ((wx - W.xmin) / Math.max(1e-3, W.xmax - W.xmin)) * (w - 12);
-    const sz = (wz) => 6 + ((wz - W.zmin) / Math.max(1e-3, W.zmax - W.zmin)) * (h - 12);
-    ctx.strokeStyle = "rgba(220,228,214,0.12)"; ctx.lineWidth = 1; ctx.strokeRect(4.5, 4.5, w - 9, h - 9);
-    const hi = headIndex(p);
-    ctx.globalCompositeOperation = "lighter";
-    for (let i = 0; i <= hi; i++) { const q = D.pts[i], rec = i / Math.max(1, hi); ctx.fillStyle = "rgba(208,222,210," + (0.15 + rec * 0.5).toFixed(2) + ")"; ctx.fillRect(sx(q.wx) - 0.5, sz(q.wz) - 0.5, 1.6, 1.6); }
-    ctx.globalCompositeOperation = "source-over";
-    const head = D.pts[hi]; if (head) { const x = sx(head.wx), y = sz(head.wz); ctx.strokeStyle = "rgba(245,248,242,0.9)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.stroke(); }
-  }
+    // 4) masthead + live PT readout (top), session metrics (top-left)
+    ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+    halo(0.6, 4);
+    ctx.letterSpacing = "2.5px"; ctx.fillStyle = "rgba(246,247,243,0.95)"; ctx.font = "500 15px " + F;
+    ctx.fillText("PLAYSPLAT", pad, pad + 12);
+    const tw = ctx.measureText("PLAYSPLAT ").width;
+    ctx.font = "300 15px " + F; ctx.fillStyle = "rgba(246,247,243,0.6)"; ctx.fillText("INTERACTION FIELD", pad + tw, pad + 12);
+    ctx.letterSpacing = "1.5px"; ctx.fillStyle = "rgba(214,224,212,0.6)"; ctx.font = "400 9px " + F;
+    ctx.fillText("OPERATIONAL IMAGE · COLLECTIVE TRACE", pad, pad + 28);
+    ctx.textAlign = "right";
+    ctx.fillText("PT " + pad3(count) + " / " + pad3(N) + "   T+" + fmtT((head ? head.t : D.t0) - D.t0), vw - pad, pad + 12);
+    ctx.textAlign = "left"; noHalo(); ctx.letterSpacing = "0px";
 
-  function drawDial(p) {
-    if (!DIAL || !DIAL.w) return;
-    const ctx = DIAL.ctx, w = DIAL.w, h = DIAL.h; ctx.clearRect(0, 0, w, h);
-    const cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.36;
-    const rot = (performance.now() / 7000) % (Math.PI * 2);
-    ctx.strokeStyle = "rgba(220,228,214,0.25)"; ctx.lineWidth = 1;
-    for (let i = 0; i < 40; i++) { const a = rot + (i / 40) * Math.PI * 2, r0 = R + 5, r1 = R + (i % 5 === 0 ? 10 : 7); ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); ctx.stroke(); }
-    ctx.strokeStyle = "rgba(220,228,214,0.15)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeStyle = "rgba(236,240,232,0.9)"; ctx.lineWidth = 2; ctx.lineCap = "round";
-    ctx.beginPath(); ctx.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2); ctx.stroke(); ctx.lineCap = "butt";
-    const hi = headIndex(p);
-    ctx.textAlign = "center"; ctx.letterSpacing = "0.5px";
-    ctx.fillStyle = "rgba(245,248,242,0.95)"; ctx.font = "500 " + Math.round(R * 0.55) + "px " + F;
-    ctx.fillText(String(hi + 1), cx, cy + R * 0.08);
-    ctx.font = "9px " + F; ctx.fillStyle = "rgba(174,191,172,0.7)"; ctx.fillText("of " + N, cx, cy + R * 0.46);
-    ctx.textAlign = "left"; ctx.letterSpacing = "0px";
-  }
-
-  function drawTL(p) {
-    if (!TL || !TL.w) return;
-    const ctx = TL.ctx, w = TL.w, h = TL.h; ctx.clearRect(0, 0, w, h);
-    const lanes = topEffects, plotW = w - LABW, lh = h / Math.max(1, lanes.length);
-    ctx.strokeStyle = "rgba(220,228,214,0.08)"; ctx.lineWidth = 1;
-    for (let i = 0; i <= 10; i++) { const x = LABW + (i / 10) * plotW; ctx.beginPath(); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, h); ctx.stroke(); }
-    ctx.textBaseline = "middle"; ctx.font = "10px " + F; ctx.letterSpacing = "0.3px";
-    lanes.forEach((e, li) => {
-      const y = li * lh + lh / 2;
-      ctx.strokeStyle = "rgba(220,228,214,0.06)"; ctx.beginPath(); ctx.moveTo(0, (li + 1) * lh - 0.5); ctx.lineTo(w, (li + 1) * lh - 0.5); ctx.stroke();
-      let laneOn = false;
-      for (const q of D.pts) {
-        if (q.fx !== e.name) continue;
-        const tn = (q.t - D.t0) / dur, x = LABW + tn * plotW, on = tn <= p;
-        if (on && Math.abs(tn - p) < 0.025) laneOn = true;
-        ctx.fillStyle = on ? "rgba(236,240,232,0.85)" : "rgba(236,240,232,0.16)";
-        ctx.fillRect(x - 1, y - lh * 0.26, 2, lh * 0.52);
-      }
-      ctx.fillStyle = laneOn ? "rgba(245,248,242,0.95)" : "rgba(190,200,186,0.55)";
-      ctx.fillText(e.name, 4, y);
+    const s = D.stats;
+    let my = pad + 56; const valX = pad + 96;
+    halo(0.55, 3);
+    ctx.letterSpacing = "1.6px"; ctx.font = "500 9px " + F; ctx.fillStyle = "rgba(200,214,198,0.72)";
+    ctx.fillText("SESSION", pad, my); my += 16;
+    ctx.letterSpacing = "0.3px";
+    [["Interactions", s.n], ["Rate", s.ipm + " / min"], ["Centroid", (s.centroid || []).join("  ")], ["Extent", (s.extent || []).join("  ")]].forEach(([l, v]) => {
+      ctx.font = "400 10px " + F; ctx.fillStyle = "rgba(224,232,220,0.62)"; ctx.fillText(l, pad, my);
+      ctx.fillStyle = "rgba(246,248,242,0.92)"; ctx.fillText(String(v), valX, my); my += 16;
     });
-    ctx.letterSpacing = "0px"; ctx.textBaseline = "alphabetic";
-    if (playheadEl) playheadEl.style.left = (LABW + p * plotW) + "px";
+    noHalo();
+
+    // 5) effect distribution (left, under metrics) — current effect highlighted
+    my += 14;
+    halo(0.55, 3);
+    ctx.letterSpacing = "1.6px"; ctx.font = "500 9px " + F; ctx.fillStyle = "rgba(200,214,198,0.72)";
+    ctx.fillText("EFFECT DISTRIBUTION", pad, my); my += 16;
+    ctx.letterSpacing = "0.3px";
+    const maxC = Math.max(1, Math.max.apply(null, topEffects.map((e) => e.count))), barW = 168;
+    topEffects.forEach((e) => {
+      const on = e.name === curFx;
+      ctx.font = "400 10px " + F; ctx.fillStyle = on ? "rgba(246,248,242,0.98)" : "rgba(232,238,226,0.82)"; ctx.fillText(e.name, pad, my);
+      ctx.textAlign = "right"; ctx.fillStyle = "rgba(246,248,242,0.82)"; ctx.fillText(String(e.count), pad + barW, my); ctx.textAlign = "left";
+      ctx.fillStyle = on ? "rgba(246,248,242,0.85)" : "rgba(236,240,232,0.4)"; ctx.fillRect(pad, my + 4, (e.count / maxC) * barW, 1.5);
+      my += 18;
+    });
+    noHalo(); ctx.letterSpacing = "0px";
+
+    // 6) effect-signal timeline (bottom) — lanes, real interaction ticks, playhead
+    if (topEffects.length) {
+      const tlTop = vh - TLBOT - TLH, plotX = pad + GUT, plotW = vw - pad * 2 - GUT;
+      halo(0.5, 3); ctx.letterSpacing = "1.6px"; ctx.font = "500 9px " + F; ctx.fillStyle = "rgba(200,214,198,0.72)";
+      ctx.fillText("EFFECT SIGNAL / OVER SESSION", pad, tlTop - 12); noHalo(); ctx.letterSpacing = "0px";
+      halo(0.35, 1.5); ctx.strokeStyle = "rgba(230,236,224,0.12)"; ctx.lineWidth = 1;
+      for (let i = 0; i <= 10; i++) { const gx = plotX + i / 10 * plotW; ctx.beginPath(); ctx.moveTo(gx, tlTop); ctx.lineTo(gx, tlTop + TLH); ctx.stroke(); }
+      noHalo();
+      const lh2 = TLH / topEffects.length;
+      topEffects.forEach((e, li) => {
+        const y = tlTop + li * lh2 + lh2 / 2;
+        halo(0.4, 1.5); ctx.strokeStyle = "rgba(230,236,224,0.16)"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(plotX, y); ctx.lineTo(plotX + plotW, y); ctx.stroke();
+        ctx.font = "400 9.5px " + F; ctx.fillStyle = "rgba(232,238,228,0.78)"; ctx.fillText(e.name, pad, y + 3); noHalo();
+        for (const q of D.pts) {
+          if ((q.fx || "") !== e.name) continue;
+          const tn = (q.t - D.t0) / dur, mx = plotX + tn * plotW, on = tn <= p;
+          halo(on ? 0.5 : 0.3, on ? 2 : 1.2); ctx.strokeStyle = on ? "rgba(246,248,242,0.9)" : "rgba(236,240,232,0.3)"; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.moveTo(mx, y - lh2 * 0.26); ctx.lineTo(mx, y + lh2 * 0.26); ctx.stroke(); noHalo();
+        }
+      });
+      halo(0.5, 3); ctx.strokeStyle = "rgba(246,248,242,0.75)"; ctx.lineWidth = 1;
+      const phx = plotX + p * plotW; ctx.beginPath(); ctx.moveTo(phx, tlTop - 4); ctx.lineTo(phx, tlTop + TLH + 4); ctx.stroke(); noHalo();
+    }
   }
 
   let progress = 0, playing = true, last = 0;
-  const SECS = clamp(dur, 8, 20);
-
-  function renderAll(p) {
-    progress = p;
-    const head = drawCentral(p);
-    drawDist(p); drawAct(p); drawPlan(p); drawDial(p); drawTL(p);
-    if (rd) rd.textContent = "PT " + clamp(Math.floor(p * N), 1, N) + " / " + N +
-      "   T+" + fmtT((head ? head.t : D.t0) - D.t0) + (head && head.fx ? ("   " + head.fx) : "");
-  }
-  function layoutAll() { [C, DIST, ACT, PLAN, DIAL, TL].forEach(fit); layoutStage(); }
-
-  function loop(ts) {
-    if (!last) last = ts;
-    const dt = (ts - last) / 1000; last = ts;
-    if (playing) { progress += dt / SECS; if (progress >= 1) progress = 0; }
-    renderAll(progress);
-    requestAnimationFrame(loop);
-  }
+  const SECS = clamp(dur, 8, 22);
+  function loop(ts) { if (!last) last = ts; const dt = (ts - last) / 1000; last = ts; if (playing) { progress += dt / SECS; if (progress >= 1) progress = 0; } render(progress); requestAnimationFrame(loop); }
 
   if (pp) pp.addEventListener("click", () => { playing = !playing; pp.textContent = playing ? "❚❚" : "▶"; });
-  const scrub = $("scrub");
   if (scrub) {
     let drag = false;
-    const pAt = (clientX) => { const r = TL.cv.getBoundingClientRect(); return clamp((clientX - r.left - LABW) / Math.max(1, r.width - LABW), 0, 1); };
+    const pAt = (cx) => clamp((cx - (pad + GUT)) / Math.max(1, vw - pad * 2 - GUT), 0, 1);
     scrub.addEventListener("pointerdown", (e) => { drag = true; scrub.setPointerCapture(e.pointerId); playing = false; if (pp) pp.textContent = "▶"; progress = pAt(e.clientX); });
     scrub.addEventListener("pointermove", (e) => { if (drag) progress = pAt(e.clientX); });
     scrub.addEventListener("pointerup", () => { drag = false; });
     scrub.addEventListener("pointercancel", () => { drag = false; });
   }
-  window.addEventListener("resize", layoutAll);
-
-  (function metricsFill() {
-    const m = $("metrics"); if (!m) return;
-    const s = D.stats, row = (l, v) => '<div class="m"><span>' + l + '</span><b>' + v + '</b></div>';
-    m.innerHTML = row("Interactions", s.n) + row("Rate", s.ipm + " / min") +
-      row("Centroid", (s.centroid || []).join("  ")) + row("Extent", (s.extent || []).join("  "));
-  })();
-
-  layoutAll();
-  requestAnimationFrame(loop);
+  window.addEventListener("resize", () => { layout(); render(progress); });
+  layout(); requestAnimationFrame(loop);
 }
 
 function trajectoryHTML(json) {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>PlaySplat — Interaction Dashboard</title>
+<title>PlaySplat — Interaction Field</title>
 <style>
-  html,body{margin:0;height:100%;background:#05070a;color:#e6ebe2;
-    font:12px "Helvetica Neue","Inter",Arial,sans-serif;font-weight:300;overflow:hidden;
-    font-variant-numeric:tabular-nums}
-  *{box-sizing:border-box}
-  .dash{display:grid;grid-template-columns:248px 1fr 248px;grid-template-rows:1fr 176px;
-    gap:14px;height:100vh;padding:16px}
-  .col{display:flex;flex-direction:column;gap:12px;min-height:0}
-  .left{grid-column:1;grid-row:1}
-  .stagewrap{grid-column:2;grid-row:1;position:relative;min-height:0;border:1px solid rgba(220,228,214,.12)}
-  .right{grid-column:3;grid-row:1}
-  .tlwrap{grid-column:1 / -1;grid-row:2;display:flex;flex-direction:column;gap:8px;min-height:0}
-  #c{position:absolute;inset:0;width:100%;height:100%;display:block}
-  .brand{font-size:14px;font-weight:500;color:#f4f6f0;letter-spacing:.2em}
-  .brand span{font-weight:300;opacity:.55;font-size:11.5px;letter-spacing:.1em}
-  .sub{margin-top:5px;font-size:9px;color:#aebfac;opacity:.6;text-transform:uppercase;letter-spacing:.18em}
-  .metrics{margin-top:12px;font-size:11px}
-  .metrics .m{display:flex;justify-content:space-between;gap:18px;line-height:1.95}
-  .metrics .m span{color:#c4d0c0;opacity:.55}
-  .metrics .m b{font-weight:500;color:#eef2ea}
-  .panel{border:1px solid rgba(220,228,214,.16);padding:10px;display:flex;flex-direction:column;min-height:0;flex:1}
-  .panel h3{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#aebfac;font-weight:500;margin:0 0 6px}
-  .panel canvas{flex:1;width:100%;min-height:0;display:block}
-  .tl{position:relative;flex:1;border:1px solid rgba(220,228,214,.16);min-height:0}
-  .tl canvas{width:100%;height:100%;display:block}
-  .ph{position:absolute;top:0;bottom:0;width:1px;background:#eef2ea;left:96px;pointer-events:none;box-shadow:0 0 6px rgba(238,242,234,.5)}
-  .scrub{position:absolute;inset:0;cursor:ew-resize}
-  .bar{display:flex;align-items:center;gap:16px}
-  #pp{background:transparent;color:#e6ebe2;border:1px solid rgba(220,228,214,.34);font:inherit;
-    letter-spacing:.14em;padding:7px 15px;cursor:pointer}
+  html,body{margin:0;height:100%;background:#05070a;overflow:hidden;
+    font:12px "Helvetica Neue","Inter",Arial,sans-serif;font-variant-numeric:tabular-nums}
+  #c{position:fixed;inset:0;width:100vw;height:100vh;display:block}
+  #scrub{position:fixed;left:0;right:0;bottom:0;height:190px;z-index:2;cursor:ew-resize}
+  .ctl{position:fixed;left:24px;bottom:16px;z-index:3;display:flex;align-items:center;gap:14px}
+  #pp{background:rgba(8,11,13,0.35);color:#e6ebe2;border:1px solid rgba(220,228,214,.4);
+    font:inherit;letter-spacing:.14em;padding:7px 15px;cursor:pointer;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
   #pp:hover{background:#e6ebe2;color:#05070a}
-  #rd{color:#cdd8c8;letter-spacing:.12em;font-size:11px}
-  @media(max-width:900px){.dash{grid-template-columns:1fr;grid-template-rows:1fr 150px}
-    .left,.right{display:none}.stagewrap{grid-column:1}.tlwrap{grid-column:1}}
 </style></head>
 <body>
-  <div class="dash">
-    <aside class="col left">
-      <div>
-        <div class="brand">PLAYSPLAT&nbsp;&nbsp;<span>Interaction Dashboard</span></div>
-        <div class="sub">operational image · collective trace</div>
-        <div id="metrics" class="metrics"></div>
-      </div>
-      <div class="panel"><h3>Effect distribution</h3><canvas id="dist"></canvas></div>
-    </aside>
-    <main class="stagewrap"><canvas id="c"></canvas></main>
-    <aside class="col right">
-      <div class="panel"><h3>Activity / time</h3><canvas id="act"></canvas></div>
-      <div class="panel"><h3>Plan view · XZ</h3><canvas id="plan"></canvas></div>
-      <div class="panel"><h3>Progress</h3><canvas id="dial"></canvas></div>
-    </aside>
-    <footer class="tlwrap">
-      <div class="tl"><canvas id="tl"></canvas><div id="playhead" class="ph"></div><div id="scrub" class="scrub"></div></div>
-      <div class="bar"><button id="pp">❚❚</button><div id="rd">—</div></div>
-    </footer>
-  </div>
+  <canvas id="c"></canvas>
+  <div id="scrub"></div>
+  <div class="ctl"><button id="pp">❚❚</button></div>
   <script>window.__TRAJ__=${json};(${_trajViewer.toString()})();</script>
 </body></html>`;
 }
