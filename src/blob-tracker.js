@@ -332,14 +332,14 @@ export class BlobTracker {
       centroid: [cx, cy, cz], extent: [xmax - xmin, ymax - ymin, zmax - zmin], topEffects };
   }
 
-  // Export the accumulated interaction history as a composed "interaction
-  // field" PNG, projected through the CURRENT camera so it sits over the
-  // garden the way the audience saw it. Beyond a density heatmap, it draws the
-  // temporal TRAJECTORY connecting touches in order (a glowing comet route),
-  // bright nodes with scattered telemetry labels, and framed corner data
-  // panels — an operational-image keepsake rather than a clinical heatmap.
+  // Export the interaction history as a composed "interaction field" PNG —
+  // a studio data-graphic laid as an OVERLAY over the bright scene (no dark
+  // wash, only a soft vignette). It draws the temporal trajectory, nodes,
+  // leader-line annotations into the margins, session metrics + effect
+  // distribution, and a full-width effect-signal timeline, all in light sans
+  // with a soft halo for legibility over the lit garden.
   // @param {object} opts
-  // @param {HTMLCanvasElement} [opts.background] - the WebGL canvas to dim behind.
+  // @param {HTMLCanvasElement} [opts.background] - the freshly rendered scene canvas.
   // @param {number} [opts.scale] - supersampling factor for a crisp export.
   exportHeatmap({ background = null, returnCanvas = false, scale = 2 } = {}) {
     const pts = this._collectTrajectory();
@@ -350,63 +350,143 @@ export class BlobTracker {
     out.width = W; out.height = H;
     const ctx = out.getContext("2d");
     const X = (p) => p.x * S, Y = (p) => p.y * S;
+    const FONT = (px, w) => `${w || 400} ${px * S}px ${SANS}`;
+    const halo = (a, blur) => { ctx.shadowColor = `rgba(0,0,0,${a})`; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; ctx.shadowBlur = blur * S; };
+    const noHalo = () => { ctx.shadowBlur = 0; };
+    const f2 = (v) => v.toFixed(2);
+    const pad = 30 * S;
 
-    // 1) Backdrop — dimmed, cooled scene (or deep space if none).
-    ctx.fillStyle = "#05070a"; ctx.fillRect(0, 0, W, H);
-    if (background) {
-      try {
-        ctx.drawImage(background, 0, 0, W, H);
-        ctx.fillStyle = "rgba(5,8,12,0.66)"; ctx.fillRect(0, 0, W, H);
-      } catch (e) { /* tainted/empty */ }
-    }
+    // session-level data the overlay panels draw from
+    const st = this._sessionStats();
+    const ec = {};
+    for (const p of pts) ec[p.effect || "(none)"] = (ec[p.effect || "(none)"] || 0) + 1;
+    const topEffects = Object.entries(ec).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const t0 = pts[0].t, span = Math.max(1e-3, pts[pts.length - 1].t - t0);
 
-    // 2) Density bloom — a single soft, sage-white halo per touch, low alpha,
-    //    so density reads as a quiet luminance that belongs to the scene
-    //    rather than a saturated blue/orange overlay.
-    ctx.globalCompositeOperation = "lighter";
-    const R = Math.max(26, Math.min(W, H) * 0.038);
-    for (const p of pts) {
-      const x = X(p), y = Y(p);
-      const g = ctx.createRadialGradient(x, y, 0, x, y, R);
-      g.addColorStop(0, "rgba(208,222,210,0.09)"); g.addColorStop(1, "rgba(208,222,210,0)");
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill();
-    }
+    // 1) Backdrop — keep the scene bright; only a soft vignette for cohesion
+    //    and edge legibility, never a flat dark wash, so the graphics read as
+    //    an overlay laid over the garden rather than a dimmed picture.
+    ctx.fillStyle = "#0a0d10"; ctx.fillRect(0, 0, W, H);
+    if (background) { try { ctx.drawImage(background, 0, 0, W, H); } catch (e) { /* tainted/empty */ } }
+    const vg = ctx.createRadialGradient(W * 0.5, H * 0.46, Math.min(W, H) * 0.18, W * 0.5, H * 0.5, Math.max(W, H) * 0.66);
+    vg.addColorStop(0, "rgba(6,9,11,0)"); vg.addColorStop(1, "rgba(6,9,11,0.4)");
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
 
-    // 3) Trajectory — delicate filaments between consecutive touches in time,
-    //    near-white at low opacity, barely brightening toward the most recent.
-    //    Hairline weight + faint glow so the web recedes into the field.
+    // 2) Trajectory — bright near-white filaments with a soft dark halo, so
+    //    the route reads cleanly over the lit scene without dimming it.
     ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.shadowColor = "rgba(225,235,225,0.45)"; ctx.shadowBlur = 1.5 * S;
+    halo(0.5, 2.5);
     for (let i = 1; i < pts.length; i++) {
       const a = pts[i - 1], b = pts[i], rec = i / pts.length;
-      ctx.strokeStyle = `rgba(236,240,232,${(0.06 + rec * 0.16).toFixed(3)})`;
-      ctx.lineWidth = (0.4 + rec * 0.55) * S;
+      ctx.strokeStyle = `rgba(244,246,240,${(0.26 + rec * 0.5).toFixed(3)})`;
+      ctx.lineWidth = (0.6 + rec * 0.9) * S;
       ctx.beginPath(); ctx.moveTo(X(a), Y(a)); ctx.lineTo(X(b), Y(b)); ctx.stroke();
     }
-    ctx.shadowBlur = 0;
-    ctx.globalCompositeOperation = "source-over";
+    noHalo();
 
-    // 4) Nodes — small soft points; every Nth gets a light reticle + a bare
-    //    numeric tag set in sans, scattered like the reference field labels.
-    const step = Math.max(1, Math.round(pts.length / 18));
-    ctx.textBaseline = "alphabetic";
-    ctx.letterSpacing = `${1 * S}px`;
-    ctx.font = `${9 * S}px ${SANS}`;
-    pts.forEach((p, i) => {
-      const x = X(p), y = Y(p);
-      ctx.fillStyle = "rgba(255,255,255,0.72)";
-      ctx.beginPath(); ctx.arc(x, y, 1.3 * S, 0, 7); ctx.fill();
-      if (i % step === 0) {
-        ctx.strokeStyle = "rgba(224,232,220,0.3)"; ctx.lineWidth = 1 * S;
-        ctx.strokeRect(x - 4 * S, y - 4 * S, 8 * S, 8 * S);
-        ctx.fillStyle = "rgba(232,238,228,0.6)";
-        ctx.fillText(String(p.track).padStart(3, "0"), x + 8 * S, y + 3.5 * S);
-      }
-    });
-    ctx.letterSpacing = "0px";
+    // 3) Nodes — small white points with a halo for contrast on any tone.
+    halo(0.5, 2);
+    for (const p of pts) { ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.beginPath(); ctx.arc(X(p), Y(p), 1.5 * S, 0, 7); ctx.fill(); }
+    noHalo();
 
-    // 5) Telemetry HUD — framed corner data blocks.
-    this._drawFieldHUD(ctx, S, W, H, pts.length);
+    // 4) Leader-line annotations — sampled detections labelled out into the
+    //    calm right margin, the way a studio data-graphic annotates a subject.
+    const annN = Math.min(6, pts.length);
+    const labelX = W - pad, elbowX = W - pad - 150 * S;
+    const bandTop = H * 0.17, bandBot = H * 0.66;
+    for (let i = 0; i < annN; i++) {
+      const p = pts[Math.floor((i + 0.5) / annN * pts.length)];
+      const nx = X(p), ny = Y(p);
+      const ly = bandTop + (annN > 1 ? i / (annN - 1) : 0) * (bandBot - bandTop);
+      halo(0.45, 2);
+      ctx.strokeStyle = "rgba(245,248,242,0.55)"; ctx.lineWidth = 1 * S;
+      ctx.beginPath(); ctx.moveTo(nx, ny); ctx.lineTo(elbowX, ly); ctx.lineTo(labelX, ly); ctx.stroke();
+      ctx.beginPath(); ctx.arc(nx, ny, 3 * S, 0, 7); ctx.stroke();
+      noHalo();
+      ctx.textAlign = "right"; halo(0.6, 3);
+      ctx.letterSpacing = `${1 * S}px`;
+      ctx.fillStyle = "rgba(246,248,242,0.95)"; ctx.font = FONT(11, 500);
+      ctx.fillText(`#${String(p.track).padStart(3, "0")}  ${(p.effect || "").toUpperCase()}`.trim(), labelX, ly - 4 * S);
+      ctx.letterSpacing = `${0.5 * S}px`;
+      ctx.fillStyle = "rgba(214,224,212,0.72)"; ctx.font = FONT(9, 400);
+      ctx.fillText(`T+${this._fmtTime(p.t - t0)}`, labelX, ly + 10 * S);
+      noHalo(); ctx.letterSpacing = "0px"; ctx.textAlign = "left";
+    }
+
+    // 5) Masthead + session metrics + effect distribution (left), all set in
+    //    light sans over a halo — no panels, no fills, pure overlay.
+    halo(0.6, 3);
+    ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+    ctx.letterSpacing = `${2.5 * S}px`;
+    ctx.fillStyle = "rgba(246,247,243,0.95)"; ctx.font = FONT(16, 500);
+    ctx.fillText("PLAYSPLAT", pad, pad + 14 * S);
+    const tw = ctx.measureText("PLAYSPLAT ").width;
+    ctx.font = FONT(16, 300); ctx.fillStyle = "rgba(246,247,243,0.6)";
+    ctx.fillText("INTERACTION FIELD", pad + tw, pad + 14 * S);
+    ctx.letterSpacing = `${1.5 * S}px`;
+    ctx.fillStyle = "rgba(214,224,212,0.6)"; ctx.font = FONT(9.5, 400);
+    ctx.fillText("OPERATIONAL IMAGE · COLLECTIVE TRACE", pad, pad + 31 * S);
+    ctx.textAlign = "right";
+    ctx.fillText(new Date().toISOString().replace("T", " ").slice(0, 19), W - pad, pad + 14 * S);
+    ctx.textAlign = "left"; noHalo();
+
+    if (st.n) {
+      let my = pad + 70 * S; const lh = 17 * S, valX = pad + 96 * S;
+      halo(0.55, 3);
+      ctx.letterSpacing = `${1.6 * S}px`; ctx.font = FONT(9, 500); ctx.fillStyle = "rgba(200,214,198,0.72)";
+      ctx.fillText("SESSION", pad, my); my += 17 * S;
+      ctx.letterSpacing = `${0.4 * S}px`;
+      const rows = [
+        ["Interactions", st.n], ["Duration", this._fmtTime(st.dur)],
+        ["Rate", `${st.ipm.toFixed(1)} / min`],
+        ["Centroid", st.centroid.map(f2).join("  ")], ["Extent", st.extent.map(f2).join("  ")],
+      ];
+      rows.forEach(([l, v]) => {
+        ctx.font = FONT(10, 400); ctx.fillStyle = "rgba(224,232,220,0.62)"; ctx.fillText(l, pad, my);
+        ctx.fillStyle = "rgba(246,248,242,0.92)"; ctx.fillText(String(v), valX, my); my += lh;
+      });
+      my += 14 * S;
+      ctx.letterSpacing = `${1.6 * S}px`; ctx.font = FONT(9, 500); ctx.fillStyle = "rgba(200,214,198,0.72)";
+      ctx.fillText("EFFECT DISTRIBUTION", pad, my); my += 18 * S;
+      ctx.letterSpacing = `${0.4 * S}px`;
+      const maxC = Math.max(1, ...topEffects.map((e) => e[1])), barW = 168 * S;
+      topEffects.forEach(([name, c]) => {
+        ctx.font = FONT(10, 400); ctx.fillStyle = "rgba(236,242,230,0.9)"; ctx.fillText(name, pad, my);
+        ctx.textAlign = "right"; ctx.fillStyle = "rgba(246,248,242,0.8)"; ctx.fillText(String(c), pad + barW, my); ctx.textAlign = "left";
+        ctx.fillStyle = "rgba(236,240,232,0.45)"; ctx.fillRect(pad, my + 4 * S, (c / maxC) * barW, 1.5 * S);
+        my += 19 * S;
+      });
+      noHalo(); ctx.letterSpacing = "0px";
+    }
+
+    // 6) Effect signal timeline (bottom, full width) — each effect a lane,
+    //    each interaction a tick at its true time across the session.
+    if (topEffects.length) {
+      const tlH = 118 * S, tlTop = H - pad - tlH, gutter = 100 * S;
+      const plotX = pad + gutter, plotW = W - pad * 2 - gutter;
+      halo(0.5, 3);
+      ctx.letterSpacing = `${1.6 * S}px`; ctx.font = FONT(9, 500); ctx.fillStyle = "rgba(200,214,198,0.72)";
+      ctx.fillText("EFFECT SIGNAL / OVER SESSION", pad, tlTop - 18 * S);
+      noHalo(); ctx.letterSpacing = "0px";
+      halo(0.35, 1.5); ctx.strokeStyle = "rgba(230,236,224,0.12)"; ctx.lineWidth = 1 * S;
+      for (let i = 0; i <= 10; i++) { const gx = plotX + i / 10 * plotW; ctx.beginPath(); ctx.moveTo(gx, tlTop); ctx.lineTo(gx, tlTop + tlH); ctx.stroke(); }
+      noHalo();
+      const lh2 = tlH / topEffects.length;
+      topEffects.forEach(([name], li) => {
+        const y = tlTop + li * lh2 + lh2 / 2;
+        halo(0.4, 1.5); ctx.strokeStyle = "rgba(230,236,224,0.18)"; ctx.lineWidth = 1 * S;
+        ctx.beginPath(); ctx.moveTo(plotX, y); ctx.lineTo(plotX + plotW, y); ctx.stroke();
+        ctx.font = FONT(9.5, 400); ctx.fillStyle = "rgba(232,238,228,0.78)"; ctx.textAlign = "left";
+        ctx.fillText(name, pad, y + 3 * S); noHalo();
+        halo(0.5, 2); ctx.strokeStyle = "rgba(246,248,242,0.85)"; ctx.lineWidth = 1.5 * S;
+        for (const p of pts) {
+          if ((p.effect || "") !== name) continue;
+          const mx = plotX + ((p.t - t0) / span) * plotW;
+          ctx.beginPath(); ctx.moveTo(mx, y - lh2 * 0.26); ctx.lineTo(mx, y + lh2 * 0.26); ctx.stroke();
+        }
+        noHalo();
+      });
+    }
 
     if (returnCanvas) return out;
     out.toBlob((blob) => {
@@ -418,75 +498,6 @@ export class BlobTracker {
       setTimeout(() => URL.revokeObjectURL(url), 2000);
     }, "image/png");
     window.__toast?.(`Field exported — ${pts.length} interactions`);
-  }
-
-  // Corner data panels for the PNG export, set in a light sans with generous
-  // tracking and two-column label/value rows — a quiet readout, not a HUD.
-  _drawFieldHUD(ctx, S, W, H, plotted) {
-    const st = this._sessionStats();
-    const pad = 22 * S, lh = 16 * S, padIn = 11 * S, gap = 16 * S;
-    const font = (px, w) => `${w || 400} ${px * S}px ${SANS}`;
-    ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
-
-    // masthead — weighted name + light qualifier on one line
-    ctx.letterSpacing = `${2.5 * S}px`;
-    ctx.fillStyle = "rgba(245,246,242,0.9)"; ctx.font = font(15, 500);
-    ctx.fillText("PLAYSPLAT", pad, pad + 13 * S);
-    const tw = ctx.measureText("PLAYSPLAT ").width;
-    ctx.font = font(15, 300); ctx.fillStyle = "rgba(245,246,242,0.5)";
-    ctx.fillText("INTERACTION FIELD", pad + tw, pad + 13 * S);
-    ctx.letterSpacing = `${1.5 * S}px`;
-    ctx.fillStyle = "rgba(210,220,210,0.42)"; ctx.font = font(9.5, 400);
-    ctx.fillText("OPERATIONAL IMAGE · COLLECTIVE TRACE", pad, pad + 29 * S);
-
-    const stamp = new Date().toISOString().replace("T", " ").slice(0, 19);
-    ctx.textAlign = "right";
-    ctx.fillText(stamp, W - pad, pad + 13 * S);
-    ctx.textAlign = "left";
-    ctx.letterSpacing = "0px";
-    if (!st.n) return;
-
-    const panel = (anchorX, y, title, rows, right) => {
-      ctx.letterSpacing = `${1.5 * S}px`; ctx.font = font(9.5, 500);
-      let labelW = ctx.measureText(title).width;
-      ctx.letterSpacing = `${0.5 * S}px`; ctx.font = font(10, 400);
-      let valW = 0;
-      for (const [l, v] of rows) {
-        labelW = Math.max(labelW, ctx.measureText(l).width);
-        valW = Math.max(valW, ctx.measureText(String(v)).width);
-      }
-      const w = padIn * 2 + labelW + gap + valW;
-      const h = (rows.length + 1) * lh + padIn * 1.4;
-      const x = right ? anchorX - w : anchorX;
-      ctx.fillStyle = "rgba(8,12,12,0.34)"; ctx.fillRect(x, y, w, h);
-      ctx.strokeStyle = "rgba(220,228,218,0.2)"; ctx.lineWidth = 1 * S; ctx.strokeRect(x, y, w, h);
-      ctx.letterSpacing = `${1.5 * S}px`; ctx.font = font(9.5, 500);
-      ctx.fillStyle = "rgba(220,228,214,0.68)"; ctx.fillText(title, x + padIn, y + padIn + 9 * S);
-      ctx.letterSpacing = `${0.5 * S}px`; ctx.font = font(10, 400);
-      rows.forEach(([l, v], i) => {
-        const ry = y + padIn + (i + 2) * lh;
-        ctx.fillStyle = "rgba(225,232,222,0.48)"; ctx.fillText(l, x + padIn, ry);
-        ctx.fillStyle = "rgba(245,248,242,0.8)"; ctx.fillText(String(v), x + padIn + labelW + gap, ry);
-      });
-      ctx.letterSpacing = "0px";
-    };
-
-    const f2 = (v) => v.toFixed(2);
-    const metrics = [
-      ["Interactions", st.n],
-      ["Duration", this._fmtTime(st.dur)],
-      ["Rate", `${st.ipm.toFixed(1)} / min`],
-      ["Centroid", st.centroid.map(f2).join("  ")],
-      ["Extent", st.extent.map(f2).join("  ")],
-    ];
-    const mh = (metrics.length + 1) * lh + padIn * 1.4;
-    panel(pad, H - pad - mh, "FIELD METRICS", metrics, false);
-
-    const fx = st.topEffects.map(([e, c]) => [e || "—", c]);
-    if (fx.length) {
-      const fh = (fx.length + 1) * lh + padIn * 1.4;
-      panel(W - pad, H - pad - fh, "TOP EFFECTORS", fx, true);
-    }
   }
 
   // Export an interactive, self-contained HTML page that REPLAYS the
