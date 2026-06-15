@@ -372,6 +372,22 @@ export class BlobTracker {
     vg.addColorStop(0, "rgba(6,9,11,0)"); vg.addColorStop(1, "rgba(6,9,11,0.4)");
     ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
 
+    // the signature blob-tracker bounding box: corner brackets + reticle.
+    const trackerBox = (x, y, sz, a) => {
+      const h = sz / 2, tk = Math.max(5 * S, sz * 0.26);
+      halo(0.5, 2.5);
+      ctx.strokeStyle = `rgba(238,242,232,${a})`; ctx.lineWidth = 1.4 * S;
+      ctx.beginPath();
+      ctx.moveTo(x - h, y - h + tk); ctx.lineTo(x - h, y - h); ctx.lineTo(x - h + tk, y - h);
+      ctx.moveTo(x + h - tk, y - h); ctx.lineTo(x + h, y - h); ctx.lineTo(x + h, y - h + tk);
+      ctx.moveTo(x + h, y + h - tk); ctx.lineTo(x + h, y + h); ctx.lineTo(x + h - tk, y + h);
+      ctx.moveTo(x - h + tk, y + h); ctx.lineTo(x - h, y + h); ctx.lineTo(x - h, y + h - tk);
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(238,242,232,${a * 0.28})`; ctx.lineWidth = 1 * S; ctx.strokeRect(x - h, y - h, sz, sz);
+      ctx.strokeStyle = `rgba(238,242,232,${a})`; ctx.beginPath(); ctx.arc(x, y, 2.5 * S, 0, 7); ctx.stroke();
+      noHalo();
+    };
+
     // 2) Trajectory — bright near-white filaments with a soft dark halo, so
     //    the route reads cleanly over the lit scene without dimming it.
     ctx.lineCap = "round"; ctx.lineJoin = "round";
@@ -384,10 +400,16 @@ export class BlobTracker {
     }
     noHalo();
 
-    // 3) Nodes — small white points with a halo for contrast on any tone.
+    // 3) Nodes — small white points; the most recent interactions also get the
+    //    blob-tracker bounding box, fading toward the older ones.
     halo(0.5, 2);
     for (const p of pts) { ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.beginPath(); ctx.arc(X(p), Y(p), 1.5 * S, 0, 7); ctx.fill(); }
     noHalo();
+    const Kbox = Math.min(10, pts.length);
+    for (let i = pts.length - Kbox; i < pts.length; i++) {
+      const p = pts[i], rec = (i - (pts.length - Kbox)) / Math.max(1, Kbox - 1);
+      trackerBox(X(p), Y(p), (30 + (p.track % 5) * 7) * S, 0.22 + rec * 0.5);
+    }
 
     // 4) Leader-line annotations — sampled detections labelled out into the
     //    calm right margin, the way a studio data-graphic annotates a subject.
@@ -401,8 +423,8 @@ export class BlobTracker {
       halo(0.45, 2);
       ctx.strokeStyle = "rgba(245,248,242,0.55)"; ctx.lineWidth = 1 * S;
       ctx.beginPath(); ctx.moveTo(nx, ny); ctx.lineTo(elbowX, ly); ctx.lineTo(labelX, ly); ctx.stroke();
-      ctx.beginPath(); ctx.arc(nx, ny, 3 * S, 0, 7); ctx.stroke();
       noHalo();
+      trackerBox(nx, ny, (34 + (p.track % 4) * 8) * S, 0.8);   // annotated detection
       ctx.textAlign = "right"; halo(0.6, 3);
       ctx.letterSpacing = `${1 * S}px`;
       ctx.fillStyle = "rgba(246,248,242,0.95)"; ctx.font = FONT(11, 500);
@@ -464,21 +486,25 @@ export class BlobTracker {
     if (topEffects.length) {
       const tlH = 118 * S, tlTop = H - pad - tlH, gutter = 100 * S;
       const plotX = pad + gutter, plotW = W - pad * 2 - gutter;
-      halo(0.5, 3);
-      ctx.letterSpacing = `${1.6 * S}px`; ctx.font = FONT(9, 500); ctx.fillStyle = "rgba(200,214,198,0.72)";
+      // a soft feathered scrim behind the strip lifts it off a busy field
+      const sc = ctx.createLinearGradient(0, tlTop - 34 * S, 0, H);
+      sc.addColorStop(0, "rgba(6,8,10,0)"); sc.addColorStop(1, "rgba(6,8,10,0.5)");
+      ctx.fillStyle = sc; ctx.fillRect(0, tlTop - 34 * S, W, H - (tlTop - 34 * S));
+      halo(0.6, 4);
+      ctx.letterSpacing = `${1.6 * S}px`; ctx.font = FONT(9, 500); ctx.fillStyle = "rgba(216,226,210,0.9)";
       ctx.fillText("EFFECT SIGNAL / OVER SESSION", pad, tlTop - 18 * S);
       noHalo(); ctx.letterSpacing = "0px";
-      halo(0.35, 1.5); ctx.strokeStyle = "rgba(230,236,224,0.12)"; ctx.lineWidth = 1 * S;
+      halo(0.4, 1.5); ctx.strokeStyle = "rgba(230,236,224,0.16)"; ctx.lineWidth = 1 * S;
       for (let i = 0; i <= 10; i++) { const gx = plotX + i / 10 * plotW; ctx.beginPath(); ctx.moveTo(gx, tlTop); ctx.lineTo(gx, tlTop + tlH); ctx.stroke(); }
       noHalo();
       const lh2 = tlH / topEffects.length;
       topEffects.forEach(([name], li) => {
         const y = tlTop + li * lh2 + lh2 / 2;
-        halo(0.4, 1.5); ctx.strokeStyle = "rgba(230,236,224,0.18)"; ctx.lineWidth = 1 * S;
-        ctx.beginPath(); ctx.moveTo(plotX, y); ctx.lineTo(plotX + plotW, y); ctx.stroke();
-        ctx.font = FONT(9.5, 400); ctx.fillStyle = "rgba(232,238,228,0.78)"; ctx.textAlign = "left";
+        halo(0.5, 2); ctx.strokeStyle = "rgba(230,236,224,0.3)"; ctx.lineWidth = 1 * S;
+        ctx.beginPath(); ctx.moveTo(plotX, y); ctx.lineTo(plotX + plotW, y); ctx.stroke(); noHalo();
+        halo(0.6, 3); ctx.font = FONT(9.5, 500); ctx.fillStyle = "rgba(240,244,234,0.92)"; ctx.textAlign = "left";
         ctx.fillText(name, pad, y + 3 * S); noHalo();
-        halo(0.5, 2); ctx.strokeStyle = "rgba(246,248,242,0.85)"; ctx.lineWidth = 1.5 * S;
+        halo(0.55, 2); ctx.strokeStyle = "rgba(246,248,242,0.92)"; ctx.lineWidth = 1.6 * S;
         for (const p of pts) {
           if ((p.effect || "") !== name) continue;
           const mx = plotX + ((p.t - t0) / span) * plotW;
@@ -660,6 +686,22 @@ function _trajViewer() {
   function halo(a, b) { ctx.shadowColor = "rgba(0,0,0," + a + ")"; ctx.shadowBlur = b; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; }
   function noHalo() { ctx.shadowBlur = 0; }
 
+  // the signature blob-tracker bounding box: corner brackets + reticle
+  function trackerBox(x, y, sz, a) {
+    const h = sz / 2, tk = Math.max(5, sz * 0.26);
+    halo(0.5, 2.5);
+    ctx.strokeStyle = "rgba(238,242,232," + a + ")"; ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(x - h, y - h + tk); ctx.lineTo(x - h, y - h); ctx.lineTo(x - h + tk, y - h);
+    ctx.moveTo(x + h - tk, y - h); ctx.lineTo(x + h, y - h); ctx.lineTo(x + h, y - h + tk);
+    ctx.moveTo(x + h, y + h - tk); ctx.lineTo(x + h, y + h); ctx.lineTo(x + h - tk, y + h);
+    ctx.moveTo(x - h + tk, y + h); ctx.lineTo(x - h, y + h); ctx.lineTo(x - h, y + h - tk);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(238,242,232," + (a * 0.28) + ")"; ctx.lineWidth = 1; ctx.strokeRect(x - h, y - h, sz, sz);
+    ctx.strokeStyle = "rgba(238,242,232," + a + ")"; ctx.beginPath(); ctx.arc(x, y, 2.5, 0, 7); ctx.stroke();
+    noHalo();
+  }
+
   function layout() {
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     vw = window.innerWidth; vh = window.innerHeight;
@@ -688,8 +730,8 @@ function _trajViewer() {
     // 2) feathered top/bottom scrims (gradients, never hard boxes) to seat text
     let g = ctx.createLinearGradient(0, 0, 0, 175); g.addColorStop(0, "rgba(6,8,10,0.42)"); g.addColorStop(1, "rgba(6,8,10,0)");
     ctx.fillStyle = g; ctx.fillRect(0, 0, vw, 175);
-    g = ctx.createLinearGradient(0, vh - 210, 0, vh); g.addColorStop(0, "rgba(6,8,10,0)"); g.addColorStop(1, "rgba(6,8,10,0.5)");
-    ctx.fillStyle = g; ctx.fillRect(0, vh - 210, vw, 210);
+    g = ctx.createLinearGradient(0, vh - 250, 0, vh); g.addColorStop(0, "rgba(6,8,10,0)"); g.addColorStop(1, "rgba(6,8,10,0.62)");
+    ctx.fillStyle = g; ctx.fillRect(0, vh - 250, vw, 250);
 
     // 3) trajectory + nodes + head reticle with leader annotation
     ctx.lineCap = "round"; ctx.lineJoin = "round";
@@ -704,14 +746,19 @@ function _trajViewer() {
     halo(0.5, 2);
     for (let i = 0; i < count; i++) { const q = D.pts[i]; ctx.fillStyle = "rgba(255,255,255,0.82)"; ctx.beginPath(); ctx.arc(SX(q.x), SY(q.y), 1.6, 0, 7); ctx.fill(); }
     noHalo();
+    // recent detections rendered as blob-tracker boxes, fading by recency
+    const Kbox = Math.min(9, count);
+    for (let i = count - Kbox; i < count - 1; i++) {
+      if (i < 0) continue;
+      const q = D.pts[i], rec = (i - (count - Kbox)) / Math.max(1, Kbox - 1);
+      trackerBox(SX(q.x), SY(q.y), 28 + (q.track % 5) * 6, 0.2 + rec * 0.42);
+    }
     if (head) {
       const hx = SX(head.x), hy = SY(head.y);
-      halo(0.5, 2.5); ctx.strokeStyle = "rgba(232,238,228,0.9)"; ctx.lineWidth = 1;
-      ctx.strokeRect(hx - 6, hy - 6, 12, 12);
+      trackerBox(hx, hy, 46, 0.95);   // the active detection box
       const ly = clamp(hy, vh * 0.24, vh * 0.62), ex = vw - pad - 150;
-      ctx.strokeStyle = "rgba(245,248,242,0.6)";
-      ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(ex, ly); ctx.lineTo(vw - pad, ly); ctx.stroke();
-      ctx.beginPath(); ctx.arc(hx, hy, 3.5, 0, 7); ctx.stroke(); noHalo();
+      halo(0.5, 2.5); ctx.strokeStyle = "rgba(245,248,242,0.6)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(ex, ly); ctx.lineTo(vw - pad, ly); ctx.stroke(); noHalo();
       ctx.textAlign = "right"; halo(0.6, 3);
       ctx.letterSpacing = "1px"; ctx.fillStyle = "rgba(246,248,242,0.95)"; ctx.font = "500 12px " + F;
       ctx.fillText(("#" + pad3(head.track) + "  " + (head.fx || "").toUpperCase()).trim(), vw - pad, ly - 4);
@@ -764,21 +811,21 @@ function _trajViewer() {
     // 6) effect-signal timeline (bottom) — lanes, real interaction ticks, playhead
     if (topEffects.length) {
       const tlTop = vh - TLBOT - TLH, plotX = pad + GUT, plotW = vw - pad * 2 - GUT;
-      halo(0.5, 3); ctx.letterSpacing = "1.6px"; ctx.font = "500 9px " + F; ctx.fillStyle = "rgba(200,214,198,0.72)";
+      halo(0.6, 4); ctx.letterSpacing = "1.6px"; ctx.font = "500 9px " + F; ctx.fillStyle = "rgba(216,226,210,0.9)";
       ctx.fillText("EFFECT SIGNAL / OVER SESSION", pad, tlTop - 12); noHalo(); ctx.letterSpacing = "0px";
-      halo(0.35, 1.5); ctx.strokeStyle = "rgba(230,236,224,0.12)"; ctx.lineWidth = 1;
+      halo(0.4, 1.5); ctx.strokeStyle = "rgba(230,236,224,0.14)"; ctx.lineWidth = 1;
       for (let i = 0; i <= 10; i++) { const gx = plotX + i / 10 * plotW; ctx.beginPath(); ctx.moveTo(gx, tlTop); ctx.lineTo(gx, tlTop + TLH); ctx.stroke(); }
       noHalo();
       const lh2 = TLH / topEffects.length;
       topEffects.forEach((e, li) => {
         const y = tlTop + li * lh2 + lh2 / 2;
-        halo(0.4, 1.5); ctx.strokeStyle = "rgba(230,236,224,0.16)"; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(plotX, y); ctx.lineTo(plotX + plotW, y); ctx.stroke();
-        ctx.font = "400 9.5px " + F; ctx.fillStyle = "rgba(232,238,228,0.78)"; ctx.fillText(e.name, pad, y + 3); noHalo();
+        halo(0.5, 2); ctx.strokeStyle = "rgba(230,236,224,0.3)"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(plotX, y); ctx.lineTo(plotX + plotW, y); ctx.stroke(); noHalo();
+        halo(0.6, 3); ctx.font = "500 9.5px " + F; ctx.fillStyle = "rgba(240,244,234,0.92)"; ctx.fillText(e.name, pad, y + 3); noHalo();
         for (const q of D.pts) {
           if ((q.fx || "") !== e.name) continue;
           const tn = (q.t - D.t0) / dur, mx = plotX + tn * plotW, on = tn <= p;
-          halo(on ? 0.5 : 0.3, on ? 2 : 1.2); ctx.strokeStyle = on ? "rgba(246,248,242,0.9)" : "rgba(236,240,232,0.3)"; ctx.lineWidth = 1.5;
+          halo(on ? 0.55 : 0.4, on ? 2 : 1.5); ctx.strokeStyle = on ? "rgba(246,248,242,0.92)" : "rgba(236,240,232,0.45)"; ctx.lineWidth = 1.6;
           ctx.beginPath(); ctx.moveTo(mx, y - lh2 * 0.26); ctx.lineTo(mx, y + lh2 * 0.26); ctx.stroke(); noHalo();
         }
       });
