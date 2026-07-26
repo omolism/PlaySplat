@@ -8610,6 +8610,71 @@ body.intro-playing #playbar { opacity: 0; pointer-events: none; transition: opac
 }
 .ui-pop .pop-empty { color: var(--text-dim); font-size: 11.5px; padding: 2px 0; }
 
+/* Pill switch — the same affordance the layer panel uses, so "on" looks the
+   same everywhere. A native checkbox read as a form control and made the
+   popovers feel like a different application. */
+.ui-pop .pop-toggle {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.ui-pop .pop-toggle.on {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(255, 255, 255, 0.92);
+}
+.ui-pop .pop-toggle .pop-toggle-knob {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  /* Same overshoot curve as the layer panel switch, so the two feel like one
+     control rather than two lookalikes. */
+  transition: transform 0.28s cubic-bezier(.34, 1.56, .64, 1),
+              background 0.18s ease, width 0.12s ease;
+}
+.ui-pop .pop-toggle.on .pop-toggle-knob {
+  transform: translateX(12px);
+  background: #0b0f14;
+}
+.ui-pop .pop-toggle:active .pop-toggle-knob { width: 16px; }
+
+/* Disclosure for secondary parameters. */
+.ui-pop .pop-more { margin-top: 2px; }
+.ui-pop .pop-more-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.ui-pop .pop-more-toggle:hover { color: var(--text); }
+.ui-pop .pop-more-caret {
+  display: inline-block;
+  font-size: 8px;
+  transition: transform 0.18s cubic-bezier(.16, 1, .3, 1);
+}
+.ui-pop .pop-more.open .pop-more-caret { transform: rotate(90deg); }
+.ui-pop .pop-more-body { display: none; }
+.ui-pop .pop-more.open .pop-more-body { display: block; }
+
 /* --- Trace panel: the popover specialised for the recorder ---------------
    Layout intent: the artifact leads, the controls stay quiet, and the three
    exports carry equal weight because they are the payoff. No section headers:

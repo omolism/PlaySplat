@@ -3136,40 +3136,13 @@ async function loadSplat() {
   // Brush off (default) → click-to-trigger (one-shot FX at click point).
   // Brush on             → press + drag = continuous paint via effects.brushAt.
   // Same flow drives mouse pointer events AND hand-pinch (see hand block below).
+  // Brush Mode and Effector Mode were retired: both narrowed interaction more
+  // than they opened it. Brush locked OrbitControls, so painting and looking
+  // became modal; Effector only worked inside one shader path and force-switched
+  // the effect to reach it. Click and pinch already cover the interaction the
+  // piece is about. The flags stay defined and permanently false so the
+  // downstream guards that read them short-circuit without further surgery.
   const brushParams = { brush: false, effector: false };
-  // Interaction folder (top-level under Customize, not nested under FX) —
-  // these toggles control INPUT MODE (camera vs paint), which is a global
-  // behaviour, not a click-effect setting. Living next to FX keeps it
-  // discoverable but separates the concerns.
-  const fInteraction = (gui.fCustomize || gui).addFolder("Interaction");
-  fInteraction.add(brushParams, "brush").name("Brush Mode")
-    .onChange(v => {
-      canvas.style.cursor = v ? "crosshair" : "";
-      // Lock OrbitControls while brushing so drag doesn't accidentally
-      // tumble the camera — the user wants the brush stroke to register
-      // as paint, not as a viewport rotation. Re-enables on toggle off.
-      controls.enabled = !v;
-    });
-  const brushParent = fInteraction;   // legacy local — Effector Mode below appends here
-  // Effector Mode (TD-style sphere effector for Dissolve). When on, brush
-  // press+drag drives a spatial mask that dissolves splats inside the sphere;
-  // splats outside snap back to home. Auto-switches effect to "Dissolve &
-  // Reform" since the spatial override only lives in that shader path.
-  brushParent.add(brushParams, "effector").name("Effector Mode")
-    .onChange(v => {
-      if (v) {
-        params.effect = "Dissolve & Reform";
-        // Refresh the Effect dropdown so the GUI shows the auto-switch.
-        gui.controllersRecursive().forEach(c => {
-          if (c.property === "effect") c.updateDisplay();
-        });
-        canvas.style.cursor = "crosshair";
-      } else {
-        effects.setMaskCenter(null);
-        if (effectorMesh) effectorMesh.visible = false;
-        if (!brushParams.brush) canvas.style.cursor = "";
-      }
-    });
 
   // ---- GPGPU Particles (Phase 2) --------------------------------------------
   // Top-level "Particles" folder under Customize — the particle system is a

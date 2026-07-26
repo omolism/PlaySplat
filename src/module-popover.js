@@ -40,10 +40,17 @@ export const MODULE_SPECS = {
     seg:   { label: "Prototype", vals: [["cube", "Cube"], ["sphere", "Sphere"]] },
     props: ["voxelSize"],
   },
+  // The effect popup is split rather than listed flat. Radius, Intensity and
+  // Duration are what shape the felt result and are what a visitor reaches for
+  // first; Speed and Noise Scale are per-effect tuning that most sessions never
+  // touch, so they sit behind a disclosure instead of tripling the row count.
+  // The title is replaced at open time with the name of the effect actually
+  // selected, because "Effect" tells you nothing about what you are adjusting.
   effect: {
     title: "Effect",
-    props: ["radius", "duration", "intensity", "speed", "noiseScale", "colorOn",
-            "brush", "effector"],
+    titleFrom: "effect",
+    props: ["radius", "intensity", "duration", "colorOn"],
+    more:  ["speed", "noiseScale"],
   },
 };
 
@@ -117,12 +124,28 @@ export class ModulePopover {
     let refresh = () => {};
 
     if (typeof v === "boolean") {
-      const cb = document.createElement("input");
-      cb.type = "checkbox";
-      cb.checked = v;
-      cb.addEventListener("change", () => ctrl.setValue(cb.checked));
-      widget.appendChild(cb);
-      refresh = () => { if (document.activeElement !== cb) cb.checked = ctrl.getValue(); };
+      // Pill switch rather than a native checkbox: the layer panel already
+      // established this as the product's on/off affordance, and two different
+      // switches for one meaning made the popovers read as a separate app.
+      const sw = document.createElement("button");
+      sw.type = "button";
+      sw.className = "pop-toggle" + (v ? " on" : "");
+      sw.setAttribute("role", "switch");
+      sw.setAttribute("aria-checked", String(v));
+      sw.innerHTML = `<span class="pop-toggle-knob"></span>`;
+      refresh = () => {
+        const on = !!ctrl.getValue();
+        sw.classList.toggle("on", on);
+        sw.setAttribute("aria-checked", String(on));
+      };
+      // Repaint on the same tick as the click. Leaving it to the mirror timer
+      // put up to 300 ms between the press and the knob moving, which reads as
+      // a dropped input on a control whose whole job is to feel decisive.
+      sw.addEventListener("click", () => {
+        ctrl.setValue(!ctrl.getValue());
+        refresh();
+      });
+      widget.appendChild(sw);
 
     } else if (typeof v === "number") {
       const min  = ctrl._min ?? 0;
@@ -223,7 +246,9 @@ export class ModulePopover {
     const spec = MODULE_SPECS[moduleId];
     if (!spec) return;
     this.moduleId = moduleId;
-    this.$title.textContent = spec.title;
+    // Name the thing being adjusted, not the category it belongs to.
+    const src = spec.titleFrom && this._find(spec.titleFrom);
+    this.$title.textContent = (src && src.getValue()) || spec.title;
     this.$body.innerHTML = "";
     this._rows = [];
 
@@ -231,13 +256,39 @@ export class ModulePopover {
       const segRow = this._buildSeg(spec.seg);
       if (segRow) this.$body.appendChild(segRow);
     }
-    (spec.props || []).forEach(entry => {
-      const { prop, folder } = typeof entry === "string" ? { prop: entry } : entry;
-      const ctrl = this._find(prop, folder);
-      if (!ctrl) return;                 // optional in this build
-      const row = this._buildRow(ctrl);
-      if (row) this.$body.appendChild(row);
-    });
+    const addProps = (list, into) => {
+      (list || []).forEach(entry => {
+        const { prop, folder } = typeof entry === "string" ? { prop: entry } : entry;
+        const ctrl = this._find(prop, folder);
+        if (!ctrl) return;               // optional in this build
+        const row = this._buildRow(ctrl);
+        if (row) into.appendChild(row);
+      });
+    };
+    addProps(spec.props, this.$body);
+
+    // Secondary parameters are collapsed by default: they matter to whoever is
+    // dialling in a look and are noise to everyone else, and a popover that
+    // opens at full height stops being a popover.
+    if (spec.more?.length) {
+      const wrap = document.createElement("div");
+      wrap.className = "pop-more";
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "pop-more-toggle";
+      toggle.innerHTML = `<span class="pop-more-caret">&#9656;</span> More`;
+      const inner = document.createElement("div");
+      inner.className = "pop-more-body";
+      addProps(spec.more, inner);
+      if (inner.children.length) {
+        toggle.addEventListener("click", () => {
+          const open = wrap.classList.toggle("open");
+          toggle.setAttribute("aria-expanded", String(open));
+        });
+        wrap.append(toggle, inner);
+        this.$body.appendChild(wrap);
+      }
+    }
     if (!this.$body.children.length) {
       const empty = document.createElement("div");
       empty.className = "pop-empty";
