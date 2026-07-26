@@ -51,7 +51,7 @@ export class BlobTracker {
       // The bright spawn pulse is always present; persistence only governs
       // what remains afterward. In an exhibition, raise maxBlobs so the
       // accumulation has room to build.
-      persistence:  0.6,
+      persistence:  0.85,
       maxBlobs:     24,      // FIFO cap (raise for exhibition accumulation)
       connections:  true,    // draw connector lines between trackers
       scanlines:    true,    // CRT scanline fill inside each box

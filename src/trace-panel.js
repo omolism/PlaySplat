@@ -32,47 +32,53 @@ export class TracePanel {
 
     this.el = document.createElement("div");
     this.el.id = "trace-panel";
+    // .ui-pop is the shared popover shell (see style.css): same type scale,
+    // row grammar and widget treatment as the Studio panel.
+    this.el.className = "ui-pop";
     this.el.innerHTML = `
-      <div class="tp-head">
-        <div class="tp-title">
-          <span class="tp-dot" data-k="dot" aria-hidden="true"></span>
-          Interaction Trace
-        </div>
-        <button class="tp-x" data-act="close" type="button" aria-label="Close">&times;</button>
+      <div class="pop-head">
+        <div class="pop-title">Interaction Trace</div>
+        <!-- Recording runs from page load and has no off switch in this
+             surface, so this reads as a state label rather than a control. -->
+        <span class="tp-rec" data-k="rec">Rec</span>
+        <button class="pop-x" data-act="close" type="button" aria-label="Close">&times;</button>
       </div>
 
-      <div class="tp-body">
-        <!-- Session readout leads: a recorder's most useful status is its fill
-             level, not its parameters. -->
-        <div class="tp-session">
-          <div class="tp-count" data-k="count">0</div>
-          <div class="tp-meta">
-            <span data-k="label">nothing recorded yet</span>
-            <span class="tp-sub" data-k="hint">Click or pinch the scene to leave a trace</span>
+      <div class="pop-body">
+        <!-- Session leads: a recorder's most useful status is its fill level,
+             not its parameters. -->
+        <div class="pop-sec">
+          <div class="pop-sec-title">Session</div>
+          <div class="tp-session">
+            <div class="tp-count" data-k="count">0</div>
+            <div class="tp-meta">
+              <span class="tp-label" data-k="label">nothing recorded yet</span>
+              <span class="tp-sub" data-k="hint">Click or pinch the scene to leave a trace</span>
+            </div>
           </div>
         </div>
 
-        <div class="tp-row">
-          <label class="tp-switch">
-            <input type="checkbox" data-k="record" />
-            <span>Record</span>
-          </label>
-          <button class="tp-ghost" data-act="clear" type="button">Clear</button>
-        </div>
-
-        <!-- Persistence is the one parameter that changes what the piece
-             means: ephemeral touches versus an enduring collective map. -->
-        <div class="tp-field">
-          <div class="tp-field-head">
-            <span>Persistence</span>
-            <span class="tp-val" data-k="persistVal">0.00</span>
+        <div class="pop-sec">
+          <div class="pop-sec-title">Recording</div>
+          <!-- Persistence is the one parameter that changes what the piece
+               means: ephemeral touches versus an enduring collective map. -->
+          <div class="pop-ctrl">
+            <span class="pop-name">Persistence</span>
+            <span class="pop-widget">
+              <input type="range" min="0" max="1" step="0.01" data-k="persist" />
+              <span class="pop-val" data-k="persistVal">0.00</span>
+            </span>
           </div>
-          <input type="range" min="0" max="1" step="0.01" data-k="persist" />
           <div class="tp-scale"><span>ephemeral</span><span>enduring</span></div>
+          <div class="pop-ctrl">
+            <span class="pop-name">Traces</span>
+            <span class="pop-widget"><button class="pop-btn" data-act="clear" type="button">Clear</button></span>
+          </div>
         </div>
 
-        <div class="tp-exports">
-          <div class="tp-exports-title">Export this session</div>
+        <div class="pop-sec">
+          <div class="pop-sec-title">Your participation</div>
+          <div class="pop-sec-sub">Every click you contributed, as a visualization or as raw data</div>
           <button class="tp-export" data-act="field" type="button">
             <span class="tp-ex-name">Interaction Field</span><span class="tp-ex-fmt">PNG</span>
           </button>
@@ -96,10 +102,6 @@ export class TracePanel {
       this.sync();
     });
 
-    this.$.record.addEventListener("change", () => {
-      this.tracker.setEnabled(this.$.record.checked);
-      this.sync();
-    });
     this.$.persist.addEventListener("input", () => {
       this.tracker.params.persistence = parseFloat(this.$.persist.value);
       this.sync();
@@ -136,9 +138,10 @@ export class TracePanel {
 
     this.$.count.textContent = n;
     this.$.label.textContent = t.sessionLabel();
-    this.$.record.checked = on;
-    this.$.dot.classList.toggle("live", on);
-    this.el.classList.toggle("recording", on && n > 0);
+    // Recording is on from load, so the header label is a state readout. It
+    // still reflects the flag in case the Studio folder toggles it.
+    this.$.rec.textContent = on ? "Rec" : "Paused";
+    this.$.rec.classList.toggle("off", !on);
 
     const p = t.params.persistence ?? 0;
     if (document.activeElement !== this.$.persist) this.$.persist.value = p;

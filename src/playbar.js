@@ -51,17 +51,17 @@ export class Playbar {
     this.el.id = "playbar";
     this.el.innerHTML = `
       <div class="pb-group pb-layers" role="group" aria-label="Representation">
-        <button class="pb-btn" data-layer="splatLayer">Splat</button>
+        <button class="pb-btn" data-layer="splatLayer">Splat<span class="pb-gear" data-gear="splatLayer" title="Splat parameters">&#9679;</span></button>
         <span class="pb-sub" data-sub-for="splatLayer">
           <button class="pb-subchip" data-subval="Gaussian">Gaussian</button>
           <button class="pb-subchip" data-subval="Point">Point</button>
         </span>
-        <button class="pb-btn" data-layer="quadLayer">Billboard</button>
+        <button class="pb-btn" data-layer="quadLayer">Billboard<span class="pb-gear" data-gear="quadLayer" title="Billboard parameters">&#9679;</span></button>
         <span class="pb-sub" data-sub-for="quadLayer">
           <button class="pb-subchip" data-subval="quad">Quad</button>
           <button class="pb-subchip" data-subval="circle">Circle</button>
         </span>
-        <button class="pb-btn" data-layer="voxelLayer">Voxel</button>
+        <button class="pb-btn" data-layer="voxelLayer">Voxel<span class="pb-gear" data-gear="voxelLayer" title="Voxel parameters">&#9679;</span></button>
         <span class="pb-sub" data-sub-for="voxelLayer">
           <button class="pb-subchip" data-subval="cube">Cube</button>
           <button class="pb-subchip" data-subval="sphere">Sphere</button>
@@ -70,7 +70,8 @@ export class Playbar {
       <div class="pb-sep" aria-hidden="true"></div>
       <div class="pb-group pb-fx" role="group" aria-label="Click effect">
         ${Object.keys(EFFECT_CHIPS).map(label =>
-          `<button class="pb-chip" data-effect="${EFFECT_CHIPS[label]}">${label}</button>`
+          `<button class="pb-chip" data-effect="${EFFECT_CHIPS[label]}">${label}` +
+          `<span class="pb-gear" data-gear="effect" title="Effect parameters">&#9679;</span></button>`
         ).join("")}
       </div>
       <div class="pb-sep" aria-hidden="true"></div>
@@ -84,9 +85,24 @@ export class Playbar {
     `;
     mountEl.appendChild(this.el);
 
+    // --- Module parameter popovers ----------------------------------------
+    // The dot on an active button opens that module's own controls, so a
+    // visitor can tune what they just engaged without leaving the bar for the
+    // full Studio panel. Registered before the toggle handlers and stopping
+    // propagation so a caret click never flips the layer it belongs to.
+    this.el.querySelectorAll(".pb-gear").forEach(gear => {
+      gear.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        window.__modulePopover?.toggleFor?.(gear.dataset.gear, gear.closest("button"));
+        this._sync();
+      });
+    });
+
     // --- Representation toggles ------------------------------------------
     this.el.querySelectorAll("[data-layer]").forEach(btn => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", (e) => {
+        if (e.target?.closest?.(".pb-gear")) return;
         const key = btn.dataset.layer;
         const ctrl = this.ctrls[key];
         if (!ctrl) return;
@@ -114,7 +130,8 @@ export class Playbar {
 
     // --- Effect chips (radio semantics) -----------------------------------
     this.el.querySelectorAll("[data-effect]").forEach(btn => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", (e) => {
+        if (e.target?.closest?.(".pb-gear")) return;
         this.ctrls.effect?.setValue(btn.dataset.effect);
         this._sync();
       });

@@ -8398,181 +8398,319 @@ body.intro-playing #playbar { opacity: 0; pointer-events: none; transition: opac
 }
 
 /* ===========================================================================
-   Trace Panel — the interaction recorder promoted to a top-level surface.
-   Opened from the Playbar's Trace button. Visual language follows the other
-   floating panels (frosted dark glass, hairline border) but sized as a compact
-   utility popup rather than a reading surface, and anchored above the bar it
-   is opened from instead of centre-screen.
+   UI POPOVERS — the shared surface for the Trace panel and the per-module
+   parameter popups reached from the Playbar.
+
+   Design contract: these are siblings of the Quick Guide card, not a third
+   design language. The tokens below are lifted from #key-hints: the same
+   frosted panel, the 0.22em uppercase title, section titles carrying a 3px
+   hairline accent bar, 11.5px rows with the label left and the value right,
+   and the mono micro-chip for tags. Interactive widgets keep the Studio
+   panel's treatment (0.92 white accent, the 0.05/0.40 slider pair, the
+   spring-lift button) so "how do I adjust this" stays consistent too.
    =========================================================================== */
-#trace-panel {
+.ui-pop {
   position: fixed;
-  left: 50%;
-  bottom: calc(64px + env(safe-area-inset-bottom));
-  transform: translateX(-50%) translateY(8px);
-  width: min(320px, calc(100vw - 32px));
   z-index: 1090;
   display: flex;
   flex-direction: column;
-  background: var(--panel-strong, rgba(12, 12, 12, 0.82));
-  border: 1px solid var(--hair-strong, rgba(255, 255, 255, 0.10));
-  border-radius: var(--radius, 14px);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: var(--shadow-soft, 0 12px 40px rgba(0, 0, 0, 0.45));
-  font-family: var(--font-ui, system-ui, sans-serif);
-  color: var(--text, rgba(255, 255, 255, 0.92));
+  width: min(340px, calc(100vw - 32px));
+  background: var(--panel-strong);
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+  color: var(--text);
+  font-family: var(--font-ui);
+  letter-spacing: 0.01em;
+  user-select: none;
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  transform: translateY(10px);
+  transition: opacity 0.28s ease, transform 0.28s ease, visibility 0s linear 0.28s;
 }
-#trace-panel.show {
+.ui-pop.show {
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
-  transform: translateX(-50%) translateY(0);
+  transform: translateY(0);
+  transition: opacity 0.28s ease, transform 0.28s ease, visibility 0s linear 0s;
 }
 
-#trace-panel .tp-head {
+/* --- Header: the Quick Guide title bar ----------------------------------- */
+.ui-pop .pop-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 11px 14px;
-  border-bottom: 1px solid var(--hair, rgba(255, 255, 255, 0.07));
+  gap: 10px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--hair);
 }
-#trace-panel .tp-title {
+.ui-pop .pop-title {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
+  color: var(--text);
 }
-/* Status dot: dim when idle, live green while recording. */
-#trace-panel .tp-dot {
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.22);
-  flex-shrink: 0;
+.ui-pop .pop-x {
+  font-family: var(--font-ui);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px; height: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--hair);
+  border-radius: 4px;
+  color: var(--text-mid);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
-/* Live dot matches the existing status dot in the Tech Spec drawer
-   (#tech-spec .ts-toggle-dot) so "this is on" reads the same everywhere. */
-#trace-panel .tp-dot.live {
-  background: #6bd779;
-  box-shadow: 0 0 6px rgba(107, 215, 121, 0.65);
-}
-#trace-panel.recording .tp-dot.live { animation: tp-pulse 1.8s ease-in-out infinite; }
-@keyframes tp-pulse {
-  0%, 100% { box-shadow: 0 0 6px rgba(107, 215, 121, 0.65); }
-  50%      { box-shadow: 0 0 9px rgba(107, 215, 121, 0.30); }
-}
-#trace-panel .tp-x {
-  background: none; border: 0; cursor: pointer;
-  color: var(--text-dim, rgba(255, 255, 255, 0.45));
-  font-size: 18px; line-height: 1;
-  padding: 0 2px;
-}
-#trace-panel .tp-x:hover { color: var(--text, rgba(255, 255, 255, 0.92)); }
+.ui-pop .pop-x:hover { background: rgba(255, 255, 255, 0.10); color: var(--text); }
 
-#trace-panel .tp-body { padding: 13px 14px 14px; display: flex; flex-direction: column; gap: 13px; }
+.ui-pop .pop-body {
+  padding: 15px 18px 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 
-/* Session readout leads the panel: the count is the headline number. */
-#trace-panel .tp-session { display: flex; align-items: center; gap: 11px; }
-/* Numeric readouts use the mono face, matching the profiler and the other
-   data surfaces; panel chrome stays on --font-ui like the other panels. */
+/* --- Section: uppercase title with the hairline accent bar ---------------- */
+.ui-pop .pop-sec { display: flex; flex-direction: column; }
+.ui-pop .pop-sec-title {
+  position: relative;
+  padding-left: 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.ui-pop .pop-sec-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 11px;
+  background: rgba(255, 255, 255, 0.40);
+  border-radius: 2px;
+}
+.ui-pop .pop-sec-sub {
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  margin: -4px 0 10px;
+}
+
+/* --- Row grammar: label left, widget right, Quick Guide metrics ----------- */
+.ui-pop .pop-ctrl {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) 1fr;
+  align-items: center;
+  gap: 12px;
+  min-height: 24px;
+  font-size: 11.5px;
+}
+.ui-pop .pop-name {
+  color: var(--text-mid);
+  letter-spacing: 0.005em;
+}
+.ui-pop .pop-widget { display: flex; align-items: center; gap: 9px; justify-content: flex-end; }
+
+.ui-pop input[type="checkbox"] {
+  accent-color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  margin: 0;
+}
+
+/* Slider pair matches the Studio panel exactly (track 0.05, fill 0.40). */
+.ui-pop input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  flex: 1; min-width: 84px; height: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.ui-pop input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 11px; height: 11px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  border: 0; cursor: pointer;
+}
+.ui-pop input[type="range"]::-moz-range-thumb {
+  width: 11px; height: 11px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  border: 0; cursor: pointer;
+}
+.ui-pop input[type="range"]::-moz-range-progress {
+  background: rgba(255, 255, 255, 0.40); height: 4px; border-radius: 2px;
+}
+.ui-pop .pop-val {
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  color: var(--text);
+  min-width: 28px;
+  text-align: right;
+}
+
+/* Buttons and selects: the Studio function-widget treatment. */
+.ui-pop .pop-btn {
+  font-family: var(--font-ui);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--hair-strong);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: background 0.18s cubic-bezier(.16, 1, .3, 1),
+              border-color 0.18s cubic-bezier(.16, 1, .3, 1),
+              transform 0.22s cubic-bezier(.16, 1, .3, 1);
+}
+.ui-pop .pop-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.22);
+  transform: translateY(-1px);
+}
+.ui-pop .pop-btn:active:not(:disabled) { transform: translateY(0); transition-duration: 0.08s; }
+.ui-pop .pop-btn:disabled { opacity: 0.32; cursor: default; }
+.ui-pop select.pop-btn { text-transform: none; letter-spacing: 0.01em; }
+
+/* Segmented option group — key-cap styling, active inverts like the Studio. */
+.ui-pop .pop-seg { display: inline-flex; gap: 4px; }
+.ui-pop .pop-seg button {
+  font-family: var(--font-ui);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--hair-strong);
+  border-radius: 4px;
+  color: var(--text-mid);
+  font-size: 10px;
+  line-height: 1.2;
+  padding: 2px 7px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.ui-pop .pop-seg button:hover { background: rgba(255, 255, 255, 0.12); color: var(--text); }
+.ui-pop .pop-seg button.active {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(255, 255, 255, 0.92);
+  color: #111316;
+}
+.ui-pop .pop-empty { color: var(--text-dim); font-size: 11.5px; padding: 2px 0; }
+
+/* --- Trace panel: the popover specialised for the recorder ---------------- */
+#trace-panel { left: 50%; bottom: 100px; transform: translateX(-50%) translateY(10px); }
+#trace-panel.show { transform: translateX(-50%) translateY(0); }
+
+
+/* Session readout: the count is the headline number, in mono like every
+   other data value in the product. */
+#trace-panel .tp-session { display: flex; align-items: baseline; gap: 12px; }
 #trace-panel .tp-count {
-  font-family: var(--font-mono);
   font-size: 26px;
   font-weight: 500;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  min-width: 44px;
 }
-#trace-panel .tp-meta { display: flex; flex-direction: column; gap: 2px; font-size: 11.5px; }
-#trace-panel .tp-sub { color: var(--text-dim, rgba(255, 255, 255, 0.45)); font-size: 10.5px; }
-
-#trace-panel .tp-row { display: flex; align-items: center; justify-content: space-between; }
-#trace-panel .tp-switch {
-  display: inline-flex; align-items: center; gap: 7px;
-  font-size: 12px; cursor: pointer; user-select: none;
-}
-#trace-panel .tp-switch input { accent-color: rgba(255, 255, 255, 0.92); cursor: pointer; }
-#trace-panel .tp-ghost {
-  background: transparent;
-  border: 1px solid var(--hair-strong, rgba(255, 255, 255, 0.10));
-  border-radius: var(--radius-sm, 9px);
-  color: var(--text-mid, rgba(255, 255, 255, 0.62));
-  font: inherit; font-size: 11px;
-  padding: 4px 10px; cursor: pointer;
-}
-#trace-panel .tp-ghost:hover {
-  background: var(--hover-strong, rgba(255, 255, 255, 0.08));
-  color: var(--text, rgba(255, 255, 255, 0.92));
-}
-
-#trace-panel .tp-field { display: flex; flex-direction: column; gap: 5px; }
-#trace-panel .tp-field-head {
-  display: flex; justify-content: space-between;
-  font-size: 11.5px; color: var(--text-mid, rgba(255, 255, 255, 0.62));
-}
-#trace-panel .tp-val {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  color: var(--text, rgba(255, 255, 255, 0.96));
-}
-#trace-panel input[type="range"] { width: 100%; accent-color: rgba(255, 255, 255, 0.92); cursor: pointer; }
+#trace-panel .tp-meta { display: flex; flex-direction: column; gap: 3px; }
+#trace-panel .tp-label { font-size: 11.5px; color: var(--text); }
+#trace-panel .tp-sub { font-size: 10.5px; color: var(--text-dim); }
 #trace-panel .tp-scale {
   display: flex; justify-content: space-between;
-  font-size: 9.5px; letter-spacing: 0.04em;
-  color: var(--text-dim, rgba(255, 255, 255, 0.38));
-  text-transform: uppercase;
+  font-size: 9px; letter-spacing: 0.10em; text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 4px 0 0;
+  padding-left: 84px;
 }
 
-#trace-panel .tp-exports {
-  display: flex; flex-direction: column; gap: 5px;
-  padding-top: 12px;
-  border-top: 1px solid var(--hair, rgba(255, 255, 255, 0.07));
-}
-#trace-panel .tp-exports-title {
-  font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase;
-  color: var(--text-dim, rgba(255, 255, 255, 0.38));
-  margin-bottom: 2px;
-}
+/* Export rows keep the Quick Guide row rhythm: name left, format chip right. */
 #trace-panel .tp-export {
-  display: flex; align-items: center; justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
   background: transparent;
-  border: 1px solid var(--hair-strong, rgba(255, 255, 255, 0.10));
-  border-radius: var(--radius-sm, 9px);
-  color: var(--text, rgba(255, 255, 255, 0.92));
-  font: inherit; font-size: 12px;
-  padding: 7px 11px; cursor: pointer;
-  transition: background 0.14s ease;
+  border: 0;
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  letter-spacing: 0.005em;
+  text-align: left;
+  padding: 5px 7px;
+  margin: 0 -7px;
+  cursor: pointer;
+  transition: background 0.15s ease;
 }
-#trace-panel .tp-export:hover:not(:disabled) { background: var(--hover-strong, rgba(255, 255, 255, 0.08)); }
-#trace-panel .tp-export:disabled { opacity: 0.32; cursor: default; }
+#trace-panel .tp-export:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); }
+#trace-panel .tp-export:disabled { opacity: 0.30; cursor: default; }
 #trace-panel .tp-ex-fmt {
-  font-size: 9.5px; letter-spacing: 0.06em;
-  color: var(--text-dim, rgba(255, 255, 255, 0.45));
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--hair);
+  padding: 2px 7px;
+  border-radius: 3px;
+  white-space: nowrap;
 }
 
 /* Playbar Trace badge — live session count, visible without opening anything. */
 #playbar .pb-trace { position: relative; }
 #playbar .pb-badge {
   margin-left: 6px;
-  min-width: 17px;
-  height: 16px;
+  min-width: 16px;
+  height: 15px;
   padding: 0 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.14);
-  color: var(--text, rgba(255, 255, 255, 0.96));
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--hair-strong);
+  color: var(--text);
+  font-size: 9px;
+  letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
 }
 
-/* Touch layout keeps the mobile sheet as the entry point; the desktop popup
-   would collide with the mobile bottom bar. */
-body.touch #trace-panel { display: none; }
+/* Per-module popovers are anchored horizontally to their Playbar button. */
+.ui-pop.pop-module { bottom: 100px; }
+
+/* The caret that opens a module popover, revealed on the active button. */
+#playbar .pb-gear {
+  margin-left: 5px;
+  width: 14px; height: 14px;
+  display: none;
+  align-items: center; justify-content: center;
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: 9px; line-height: 1;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+#playbar .pb-btn.active .pb-gear,
+#playbar .pb-chip.active .pb-gear { display: inline-flex; }
+#playbar .pb-gear:hover { background: rgba(255, 255, 255, 0.16); color: var(--text); }
+
+@media (max-width: 640px) {
+  .ui-pop { width: calc(100vw - 32px); }
+  #trace-panel, .ui-pop.pop-module { bottom: 80px; }
+}
+
+/* Touch keeps the mobile sheet as the entry point; these popovers would
+   collide with the mobile bottom bar. */
+body.touch .ui-pop { display: none; }

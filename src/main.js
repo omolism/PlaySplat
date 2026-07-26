@@ -7,6 +7,7 @@ import { createScanModifier, EffectController, buildGUI, params as effectParams 
 import { Profiler } from "./profiler.js";
 import { TechSpec, TECH_SPECS } from "./tech-spec.js";
 import { TracePanel } from "./trace-panel.js";
+import { ModulePopover } from "./module-popover.js";
 import { AssetHoverManager } from "./asset-hover.js";
 import { AnnotationManager } from "./annotations.js";
 import { HandController } from "./handtracking.js";
@@ -80,7 +81,13 @@ const SCENES = {
   train:  { file: "train.splat",        authored: false },
   garden: { file: "PlaySplat_PC.splat", authored: true  },
 };
-const SCENE = SCENES.garden;
+// Garden is the bundled showcase and stays the default: it ships the authored
+// flythrough, so a first visit lands in the cinematic rather than a static
+// view. `?scene=train` opens the public third-party capture instead, which is
+// the scene the accompanying paper measures; it is otherwise reached the same
+// way any visitor's own file is, by dropping it onto the page.
+const _sceneParam = new URLSearchParams(window.location.search).get("scene");
+const SCENE = SCENES[_sceneParam] || SCENES.garden;
 const SPLAT_URL = `${BASE}${SCENE.file}`;
 // Mobile variant — same 3 M splats, just re-encoded as SPZ (Niantic's
 // open-sourced compressed format). SPZ typically lands at 30-50% of the
@@ -2175,6 +2182,10 @@ async function loadSplat() {
     mountEl: document.body,
   });
   window.__tracePanel = tracePanel;
+
+  // Per-module parameter popovers for the Playbar. Projects existing lil-gui
+  // controllers, so nothing here duplicates state or can drift from Studio.
+  window.__modulePopover = new ModulePopover({ gui, mountEl: document.body });
   // The intro-video recorder stays in Camera Movement: its button doubles as
   // the recording status readout and is interlocked with Play / Stop, so it
   // only reads correctly next to them. Export still points at it, so this
