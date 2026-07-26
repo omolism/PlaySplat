@@ -1578,9 +1578,10 @@ async function loadSplat() {
   }, 400);
   _hudRefs.voxelizer = voxelizer;
   _hudRefs.quadizer  = quadizer;
-  // LOCAL PAPER-VALIDATION TOOL — console-only USD PointInstancer export.
-  // Usage: __exportUSD("voxel") / __exportUSD("billboard", { stride: 10 }).
-  // Lazy import keeps the exporter out of the production bundle path.
+  // USD PointInstancer export. Surfaced in the GUI under Export (the buttons
+  // call through this same entry point); also callable directly as
+  // __exportUSD("voxel") / __exportUSD("billboard", { stride: 10 }) for
+  // scripted runs. Lazy import keeps the exporter off the initial load path.
   window.__exportUSD = (layer = "voxel", opts = {}) => {
     import("./usd-export.js").then(m =>
       m.exportLayerUSDA(layer, { voxelizer, quadizer, ...opts })
@@ -2078,39 +2079,95 @@ async function loadSplat() {
   // Folder mirrors the Post-Process shape: an Enable checkbox, a Rotation
   // slider (0-360°, mapped to scene.backgroundRotation.y and
   // scene.environmentRotation.y), and the "Use My Own HDRI" button.
-  // ---- Blob Tracker — CV-style 3D tracking-box HUD on click --------------
-  const fBlob = gui.addFolder("Blob Tracker").close();
+  // ---- Interaction Trace — the session recorder ---------------------------
+  // Previously "Blob Tracker", filed alongside the visual effects. It has since
+  // grown from a CV-style click HUD into an instrument: it records every
+  // trigger in object space and produces the exported field / trajectory /
+  // session data. So it is organised by job now, not by feature list. The
+  // recorder's own state (is it on, how much has it captured, reset) leads;
+  // the CV-styling knobs are demoted into Appearance; and the exports have
+  // moved out entirely into the Export folder, next to the USD ones.
+  const fBlob = gui.addFolder("Interaction Trace").close();
   const _bp = blobTracker.params;
-  fBlob.add(_bp, "enable").name("Enable");
-  fBlob.add(_bp, "boxSize",  40, 320, 1).name("Box Size");
-  fBlob.add(_bp, "lifetime", 0.5, 8, 0.1).name("Active Fade (s)");
+  fBlob.add(_bp, "enable").name("Record");
+  // A recorder's most useful readout is its fill level, so the live session
+  // summary sits above the parameters. Disabled = display-only.
+  const _traceStatus = { session: "nothing recorded yet" };
+  const _traceStatusCtrl = fBlob.add(_traceStatus, "session").name("Session").disable();
+  setInterval(() => {
+    const next = blobTracker.sessionLabel();
+    if (next !== _traceStatus.session) {
+      _traceStatus.session = next;
+      _traceStatusCtrl.updateDisplay();
+    }
+  }, 500);
   // Ephemeral ↔ enduring: 0 = the box fades and vanishes; 1 = it settles to
   // a faint residual and stays, so visitors' touches accumulate as a
-  // collective trace on the garden.
+  // collective trace on the scene. This is the one parameter that changes
+  // what the piece *means*, so it stays on the top level.
   fBlob.add(_bp, "persistence", 0, 1, 0.01).name("Persistence");
-  fBlob.add(_bp, "maxBlobs", 1, 300, 1).name("Max Trackers");
-  fBlob.add(_bp, "connections").name("Connectors");
-  fBlob.add(_bp, "scanlines").name("Scanlines");
-  fBlob.add(_bp, "glow").name("Glow");
-  fBlob.add(_bp, "label").name("Show Label");
-  fBlob.add(_bp, "labelMode", {
+  fBlob.add({ clear: () => blobTracker.clearAll() }, "clear").name("Clear Traces");
+
+  // Appearance — the CV/surveillance styling of the tracking boxes. Visual
+  // taste rather than instrument behaviour, so it is folded away by default.
+  const fBlobLook = fBlob.addFolder("Appearance").close();
+  fBlobLook.add(_bp, "boxSize",  40, 320, 1).name("Box Size");
+  fBlobLook.add(_bp, "lifetime", 0.5, 8, 0.1).name("Active Fade (s)");
+  fBlobLook.add(_bp, "maxBlobs", 1, 300, 1).name("Max Trackers");
+  fBlobLook.add(_bp, "connections").name("Connectors");
+  fBlobLook.add(_bp, "scanlines").name("Scanlines");
+  fBlobLook.add(_bp, "glow").name("Glow");
+  fBlobLook.add(_bp, "label").name("Show Label");
+  fBlobLook.add(_bp, "labelMode", {
     "Track ID": "id", "Timestamp": "time", "Age": "age",
     "Coordinates": "coords", "Confidence": "confidence",
   }).name("Label Shows");
-  fBlob.add({ clear: () => blobTracker.clearAll() }, "clear").name("Clear Traces");
-  // Render a fresh frame so the viewport canvas holds the current garden view,
-  // then export over it (shared by both the PNG and HTML exporters).
+
+  // ---- Export — every artifact the system can produce, in one place -------
+  // These used to be scattered: USD was reachable only from the DevTools
+  // console, the interaction exports were buried at the bottom of the tracker's
+  // parameter list. Since "what can I take away from this?" is one question,
+  // it gets one surface.
+  const fExport = gui.addFolder("Export").close();
+
+  // Render a fresh frame so the viewport canvas holds the current view, then
+  // export over it (shared by the PNG and HTML exporters).
   const _prerenderForExport = () => {
     try {
       if (typeof postfx !== "undefined" && postfx?.params?.postEnable !== false) postfx.render(0);
       else renderer.render(scene, camera);
     } catch (e) { console.warn("[export] pre-render failed:", e); }
   };
-  fBlob.add({ exportHeat: () => { _prerenderForExport(); blobTracker.exportHeatmap({ background: renderer.domElement }); } },
-    "exportHeat").name("⬇ Export Field (PNG)");
-  fBlob.add({ exportHtml: () => { _prerenderForExport(); blobTracker.exportHeatmapHTML({ background: renderer.domElement }); } },
-    "exportHtml").name("⬇ Export Trajectory (HTML)");
-  fBlob.add({ exportCsv: () => blobTracker.exportCSV() }, "exportCsv").name("⬇ Export Data (CSV)");
+
+  // USD PointInstancer layers. The derived layers already match the schema, so
+  // this is a direct serialization with no USD runtime in the page. Stride
+  // subsamples the instances to keep authored files a manageable size.
+  const _usdParams = { stride: 1 };
+  fExport.add(_usdParams, "stride", 1, 20, 1).name("USD Stride")
+    .domElement.title = "Write every Nth instance. 1 = the full layer.";
+  const _exportUSD = (layer) => {
+    if (typeof window.__exportUSD !== "function") {
+      window.__toast?.("Build the layer first, then export");
+      return;
+    }
+    window.__exportUSD(layer, { stride: _usdParams.stride });
+  };
+  fExport.add({ v: () => _exportUSD("voxel") },     "v").name("⬇ Voxel Layer (USD)");
+  fExport.add({ b: () => _exportUSD("billboard") }, "b").name("⬇ Billboard Layer (USD)");
+
+  fExport.add({ exportHeat: () => { _prerenderForExport(); blobTracker.exportHeatmap({ background: renderer.domElement }); } },
+    "exportHeat").name("⬇ Interaction Field (PNG)");
+  fExport.add({ exportHtml: () => { _prerenderForExport(); blobTracker.exportHeatmapHTML({ background: renderer.domElement }); } },
+    "exportHtml").name("⬇ Trajectory (HTML)");
+  fExport.add({ exportCsv: () => blobTracker.exportCSV() }, "exportCsv").name("⬇ Session Data (CSV)");
+  // The intro-video recorder stays in Camera Movement: its button doubles as
+  // the recording status readout and is interlocked with Play / Stop, so it
+  // only reads correctly next to them. Export still points at it, so this
+  // folder remains the complete answer to "what can I take away?".
+  fExport.add({ goVideo: () => {
+    const f = gui.foldersRecursive?.().find(x => x._title === "Camera Movement");
+    if (f) { f.open(); f.domElement.scrollIntoView({ behavior: "smooth", block: "center" }); }
+  } }, "goVideo").name("Intro Video → Camera Movement");
 
   const fOverlay = gui.addFolder("Camera Movement");   // renamed from "Overlays"
   let hdrTex = null;

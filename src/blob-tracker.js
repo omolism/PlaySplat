@@ -119,6 +119,17 @@ export class BlobTracker {
   // "reset the canvas" gesture.
   clearAll() { this.blobs.length = 0; this.heatPoints.length = 0; this.log.length = 0; this._clear(); }
 
+  // One-line session readout for the UI: how much has actually been recorded.
+  // A recorder's most useful status is its fill level, not its parameters, so
+  // this is surfaced in the panel ahead of the appearance controls.
+  sessionLabel() {
+    const s = this._sessionStats();
+    if (!s.n) return "nothing recorded yet";
+    const mm = String(Math.floor(s.dur / 60)).padStart(2, "0");
+    const ss = String(Math.floor(s.dur % 60)).padStart(2, "0");
+    return `${s.n} interaction${s.n === 1 ? "" : "s"} · ${mm}:${ss}`;
+  }
+
   // Click → drop a tracker at the world-space hit point. `meta` carries the
   // interaction context (active effect + which representations were visible)
   // so the exported CSV is a real session log, not just coordinates.
