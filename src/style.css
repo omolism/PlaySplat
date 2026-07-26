@@ -8396,3 +8396,183 @@ body.intro-playing #playbar { opacity: 0; pointer-events: none; transition: opac
   background: rgba(255, 255, 255, 0.14);
   color: var(--text, rgba(255, 255, 255, 0.92));
 }
+
+/* ===========================================================================
+   Trace Panel — the interaction recorder promoted to a top-level surface.
+   Opened from the Playbar's Trace button. Visual language follows the other
+   floating panels (frosted dark glass, hairline border) but sized as a compact
+   utility popup rather than a reading surface, and anchored above the bar it
+   is opened from instead of centre-screen.
+   =========================================================================== */
+#trace-panel {
+  position: fixed;
+  left: 50%;
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  transform: translateX(-50%) translateY(8px);
+  width: min(320px, calc(100vw - 32px));
+  z-index: 1090;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-strong, rgba(12, 12, 12, 0.82));
+  border: 1px solid var(--hair-strong, rgba(255, 255, 255, 0.10));
+  border-radius: var(--radius, 14px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-soft, 0 12px 40px rgba(0, 0, 0, 0.45));
+  font-family: var(--font-ui, system-ui, sans-serif);
+  color: var(--text, rgba(255, 255, 255, 0.92));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+#trace-panel.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+#trace-panel .tp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--hair, rgba(255, 255, 255, 0.07));
+}
+#trace-panel .tp-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+/* Status dot: dim when idle, live green while recording. */
+#trace-panel .tp-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  flex-shrink: 0;
+}
+/* Live dot matches the existing status dot in the Tech Spec drawer
+   (#tech-spec .ts-toggle-dot) so "this is on" reads the same everywhere. */
+#trace-panel .tp-dot.live {
+  background: #6bd779;
+  box-shadow: 0 0 6px rgba(107, 215, 121, 0.65);
+}
+#trace-panel.recording .tp-dot.live { animation: tp-pulse 1.8s ease-in-out infinite; }
+@keyframes tp-pulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(107, 215, 121, 0.65); }
+  50%      { box-shadow: 0 0 9px rgba(107, 215, 121, 0.30); }
+}
+#trace-panel .tp-x {
+  background: none; border: 0; cursor: pointer;
+  color: var(--text-dim, rgba(255, 255, 255, 0.45));
+  font-size: 18px; line-height: 1;
+  padding: 0 2px;
+}
+#trace-panel .tp-x:hover { color: var(--text, rgba(255, 255, 255, 0.92)); }
+
+#trace-panel .tp-body { padding: 13px 14px 14px; display: flex; flex-direction: column; gap: 13px; }
+
+/* Session readout leads the panel: the count is the headline number. */
+#trace-panel .tp-session { display: flex; align-items: center; gap: 11px; }
+/* Numeric readouts use the mono face, matching the profiler and the other
+   data surfaces; panel chrome stays on --font-ui like the other panels. */
+#trace-panel .tp-count {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  min-width: 44px;
+}
+#trace-panel .tp-meta { display: flex; flex-direction: column; gap: 2px; font-size: 11.5px; }
+#trace-panel .tp-sub { color: var(--text-dim, rgba(255, 255, 255, 0.45)); font-size: 10.5px; }
+
+#trace-panel .tp-row { display: flex; align-items: center; justify-content: space-between; }
+#trace-panel .tp-switch {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; cursor: pointer; user-select: none;
+}
+#trace-panel .tp-switch input { accent-color: rgba(255, 255, 255, 0.92); cursor: pointer; }
+#trace-panel .tp-ghost {
+  background: transparent;
+  border: 1px solid var(--hair-strong, rgba(255, 255, 255, 0.10));
+  border-radius: var(--radius-sm, 9px);
+  color: var(--text-mid, rgba(255, 255, 255, 0.62));
+  font: inherit; font-size: 11px;
+  padding: 4px 10px; cursor: pointer;
+}
+#trace-panel .tp-ghost:hover {
+  background: var(--hover-strong, rgba(255, 255, 255, 0.08));
+  color: var(--text, rgba(255, 255, 255, 0.92));
+}
+
+#trace-panel .tp-field { display: flex; flex-direction: column; gap: 5px; }
+#trace-panel .tp-field-head {
+  display: flex; justify-content: space-between;
+  font-size: 11.5px; color: var(--text-mid, rgba(255, 255, 255, 0.62));
+}
+#trace-panel .tp-val {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text, rgba(255, 255, 255, 0.96));
+}
+#trace-panel input[type="range"] { width: 100%; accent-color: rgba(255, 255, 255, 0.92); cursor: pointer; }
+#trace-panel .tp-scale {
+  display: flex; justify-content: space-between;
+  font-size: 9.5px; letter-spacing: 0.04em;
+  color: var(--text-dim, rgba(255, 255, 255, 0.38));
+  text-transform: uppercase;
+}
+
+#trace-panel .tp-exports {
+  display: flex; flex-direction: column; gap: 5px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hair, rgba(255, 255, 255, 0.07));
+}
+#trace-panel .tp-exports-title {
+  font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--text-dim, rgba(255, 255, 255, 0.38));
+  margin-bottom: 2px;
+}
+#trace-panel .tp-export {
+  display: flex; align-items: center; justify-content: space-between;
+  background: transparent;
+  border: 1px solid var(--hair-strong, rgba(255, 255, 255, 0.10));
+  border-radius: var(--radius-sm, 9px);
+  color: var(--text, rgba(255, 255, 255, 0.92));
+  font: inherit; font-size: 12px;
+  padding: 7px 11px; cursor: pointer;
+  transition: background 0.14s ease;
+}
+#trace-panel .tp-export:hover:not(:disabled) { background: var(--hover-strong, rgba(255, 255, 255, 0.08)); }
+#trace-panel .tp-export:disabled { opacity: 0.32; cursor: default; }
+#trace-panel .tp-ex-fmt {
+  font-size: 9.5px; letter-spacing: 0.06em;
+  color: var(--text-dim, rgba(255, 255, 255, 0.45));
+}
+
+/* Playbar Trace badge — live session count, visible without opening anything. */
+#playbar .pb-trace { position: relative; }
+#playbar .pb-badge {
+  margin-left: 6px;
+  min-width: 17px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text, rgba(255, 255, 255, 0.96));
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Touch layout keeps the mobile sheet as the entry point; the desktop popup
+   would collide with the mobile bottom bar. */
+body.touch #trace-panel { display: none; }

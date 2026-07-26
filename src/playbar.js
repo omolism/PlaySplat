@@ -76,6 +76,9 @@ export class Playbar {
       <div class="pb-sep" aria-hidden="true"></div>
       <div class="pb-group pb-actions">
         <button class="pb-btn pb-tour" data-act="tour" title="Play the camera tour">&#9654; Tour</button>
+        <button class="pb-btn pb-trace" data-act="trace" title="Interaction Trace — record, review and export this session">
+          Trace<span class="pb-badge" data-k="traceCount" hidden>0</span>
+        </button>
         <button class="pb-btn pb-studio" data-act="studio" title="Open the full Studio panel (every parameter)">Studio</button>
       </div>
     `;
@@ -126,6 +129,12 @@ export class Playbar {
     this.el.querySelector('[data-act="studio"]').addEventListener("click", () => {
       this.setStudioOpen(this.gui._hidden === true);
     });
+    // Trace opens the recorder's own popup. Resolved at click time because the
+    // panel is constructed after the bar in main.js.
+    this.el.querySelector('[data-act="trace"]').addEventListener("click", () => {
+      window.__tracePanel?.toggle?.();
+      this._sync();
+    });
 
     // State mirroring is driven per-frame from the render loop (main.js calls
     // syncIfDirty()), not a timer: a 400ms poll left a visible lag between a
@@ -142,7 +151,10 @@ export class Playbar {
     const p = this.params;
     const sig = `${!!p.splatLayer}|${!!p.quadLayer}|${!!p.voxelLayer}|`
               + `${p.splatSubform}|${p.quadShape}|${p.voxelShape}|`
-              + `${p.effect}|${this.gui._hidden !== true}`;
+              + `${p.effect}|${this.gui._hidden !== true}|`
+              // Trace count + panel state: the badge is how a visitor sees
+              // their touches accumulating without opening anything.
+              + `${window.__blobTracker?.log?.length || 0}|${!!window.__tracePanel?.open}`;
     if (sig === this._lastSig) return;
     this._lastSig = sig;
     this._sync();
@@ -193,6 +205,19 @@ export class Playbar {
     });
     const studioBtn = this.el.querySelector(".pb-studio");
     if (studioBtn) studioBtn.classList.toggle("active", this.gui._hidden !== true);
+
+    // Trace: highlight while its panel is open, and carry a live count badge
+    // so the accumulating session is visible from the bar itself.
+    const traceBtn = this.el.querySelector(".pb-trace");
+    if (traceBtn) {
+      traceBtn.classList.toggle("active", !!window.__tracePanel?.open);
+      const n = window.__blobTracker?.log?.length || 0;
+      const badge = traceBtn.querySelector(".pb-badge");
+      if (badge) {
+        badge.textContent = n > 999 ? "999+" : n;
+        badge.hidden = n === 0;
+      }
+    }
   }
 
   dispose() {

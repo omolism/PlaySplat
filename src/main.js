@@ -6,6 +6,7 @@ import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import { createScanModifier, EffectController, buildGUI, params as effectParams } from "./effects.js";
 import { Profiler } from "./profiler.js";
 import { TechSpec, TECH_SPECS } from "./tech-spec.js";
+import { TracePanel } from "./trace-panel.js";
 import { AssetHoverManager } from "./asset-hover.js";
 import { AnnotationManager } from "./annotations.js";
 import { HandController } from "./handtracking.js";
@@ -2155,11 +2156,25 @@ async function loadSplat() {
   fExport.add({ v: () => _exportUSD("voxel") },     "v").name("⬇ Voxel Layer (USD)");
   fExport.add({ b: () => _exportUSD("billboard") }, "b").name("⬇ Billboard Layer (USD)");
 
-  fExport.add({ exportHeat: () => { _prerenderForExport(); blobTracker.exportHeatmap({ background: renderer.domElement }); } },
-    "exportHeat").name("⬇ Interaction Field (PNG)");
-  fExport.add({ exportHtml: () => { _prerenderForExport(); blobTracker.exportHeatmapHTML({ background: renderer.domElement }); } },
-    "exportHtml").name("⬇ Trajectory (HTML)");
-  fExport.add({ exportCsv: () => blobTracker.exportCSV() }, "exportCsv").name("⬇ Session Data (CSV)");
+  // The three interaction exports are shared verbatim with the Trace panel, so
+  // the Playbar popup and the Studio folder cannot drift apart.
+  const traceExports = {
+    field:      () => { _prerenderForExport(); blobTracker.exportHeatmap({ background: renderer.domElement }); },
+    trajectory: () => { _prerenderForExport(); blobTracker.exportHeatmapHTML({ background: renderer.domElement }); },
+    data:       () => blobTracker.exportCSV(),
+  };
+  fExport.add({ exportHeat: traceExports.field },      "exportHeat").name("⬇ Interaction Field (PNG)");
+  fExport.add({ exportHtml: traceExports.trajectory }, "exportHtml").name("⬇ Trajectory (HTML)");
+  fExport.add({ exportCsv:  traceExports.data },       "exportCsv").name("⬇ Session Data (CSV)");
+
+  // Promote the recorder to a top-level surface: the Playbar's Trace button
+  // opens this popup. The lil-gui folders above remain the expert surface.
+  const tracePanel = new TracePanel({
+    tracker: blobTracker,
+    exports: traceExports,
+    mountEl: document.body,
+  });
+  window.__tracePanel = tracePanel;
   // The intro-video recorder stays in Camera Movement: its button doubles as
   // the recording status readout and is interlocked with Play / Stop, so it
   // only reads correctly next to them. Export still points at it, so this
