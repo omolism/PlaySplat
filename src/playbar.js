@@ -30,7 +30,6 @@ const EFFECT_CHIPS = {
   Scan:    "Scan Line",
   Spiral:  "Spiral Smear",
   Vortex:  "Vortex Drift",
-  Chaos:   "Chaotic Particles",
   Slime:   "Slime Molds",
   Feather: "Feather Roots",
 };
@@ -100,13 +99,21 @@ export class Playbar {
     });
 
     // --- Representation toggles ------------------------------------------
+    // Engaging a layer also brings up its parameters: the dot alone was too
+    // small a target to be the only route to them, and the question right after
+    // "show me voxels" is almost always "how big". Turning a layer off closes
+    // the popup again so it never outlives what it belongs to.
     this.el.querySelectorAll("[data-layer]").forEach(btn => {
       btn.addEventListener("click", (e) => {
         if (e.target?.closest?.(".pb-gear")) return;
         const key = btn.dataset.layer;
         const ctrl = this.ctrls[key];
         if (!ctrl) return;
-        ctrl.setValue(!this.params[key]);   // fires the full onChange chain
+        const next = !this.params[key];
+        ctrl.setValue(next);                // fires the full onChange chain
+        const mp = window.__modulePopover;
+        if (next) mp?.showFor?.(key, btn);
+        else if (mp?.moduleId === key) mp.close();
         this._sync();
       });
     });
@@ -129,10 +136,13 @@ export class Playbar {
     });
 
     // --- Effect chips (radio semantics) -----------------------------------
+    // Picking an effect opens the effect parameters against it, so tuning the
+    // one just chosen never requires a second hunt.
     this.el.querySelectorAll("[data-effect]").forEach(btn => {
       btn.addEventListener("click", (e) => {
         if (e.target?.closest?.(".pb-gear")) return;
         this.ctrls.effect?.setValue(btn.dataset.effect);
+        window.__modulePopover?.showFor?.("effect", btn);
         this._sync();
       });
     });

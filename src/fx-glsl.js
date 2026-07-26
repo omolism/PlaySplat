@@ -160,28 +160,6 @@ export const FX_FUNCTIONS = /* glsl */`
             + uWindDir * uIntensity * mask * env * 0.18;
       crest = mask * env * 0.7;
 
-    } else if (uEffect == 5) {
-      // ---- Chaotic Particles — coherent cluster migration ------------------
-      // The dyno's 27-cell Voronoi tracking is too heavy per-vertex and reads
-      // as uncorrelated mush on hard primitives. Instead: quantize space into
-      // LARGE cells, give every cell one wander target that re-rolls each
-      // beat, and ease between beats. Whole clusters migrate together —
-      // chaotic at the macro scale, coherent at the local scale.
-      float reach = uRadius * 1.8;
-      float mask  = 1.0 - smoothstep(reach * 0.55, reach, dist);
-      float cs5   = max(uNoiseScale * 0.25, 0.05);
-      vec3  cell  = floor((center - uHit) * cs5);
-      float beat  = t * uSpeed * 0.25;
-      float b0    = floor(beat);
-      float bf    = smoothstep(0.0, 1.0, fract(beat));
-      vec3 w0 = hash33(cell + b0        * vec3(13.7, 3.1, 7.9)) - 0.5;
-      vec3 w1 = hash33(cell + (b0 + 1.0) * vec3(13.7, 3.1, 7.9)) - 0.5;
-      vec3 wander = mix(w0, w1, bf);
-      float env = smoothstep(0.0, 0.20, tNorm) * (1.0 - smoothstep(0.50, 1.0, tNorm));
-      off   = wander * uIntensity * 0.9 * mask * env
-            + jitter * 0.02 * uIntensity * mask * env;
-      crest = mask * env * 0.7;
-
     } else if (uEffect == 6) {
       // ---- Slime Molds — ridge-vein gradient pull --------------------------
       // Ridge-folded value noise forms thin veins; primitives slide up the

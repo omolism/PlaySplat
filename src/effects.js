@@ -129,7 +129,6 @@ const EFFECT_INDEX = {
   "Scan Line": 2,
   "Spiral Smear": 3,
   "Vortex Drift": 4,
-  "Chaotic Particles": 5,
   "Slime Molds": 6,
   "Feather Roots": 7,
 };
@@ -629,100 +628,6 @@ export function createScanModifier() {
                 // Optional colour tint on the flowing splats (vMask*vdEnv
                 // peaks where the vortex is active). No-op when colorOn off.
                 rgba.rgb *= mix(vec3(1.0), ${inputs.uColor}, vMask * vdEnv * 0.7);
-
-              } else if (${inputs.uEffect} == 5) {
-                // ==============================================================
-                // Effect 5 — Chaotic Particles  (port of Shadertoy
-                //   "chaoticParticles" by stephenl7797, 2021)
-                //
-                // 3D Voronoi particle tracking: each splat finds its nearest
-                // animated Voronoi cell center and is pulled toward it. As the
-                // cell offsets drift over time, splats "jump" from one cell to
-                // the next → chaotic clustering motion. The reference's
-                // "depth blur" is approximated by blooming scale + alpha
-                // proximally to cell centers (canonical Voronoi-edge metric
-                // f2-f1 as the bloom inverse).
-                //
-                // Reused knobs:
-                //   uRadius     — soft-mask reach around uHit
-                //   uNoiseScale — Voronoi cell density (higher = smaller cells)
-                //   uSpeed      — cell-offset drift rate
-                //   uIntensity  — pull magnitude toward target cell
-                //   uWindDir    — bulk direction the cell pattern flows in
-                //   uEdgeRagged — mask-edge roughness
-                // ==============================================================
-
-                float cpReach = ${inputs.uRadius} * 1.8;
-                float cpMask  = 1.0 - smoothstep(cpReach * 0.55, cpReach, dist);
-                cpMask        = clamp(cpMask + (n - 0.5) * 0.22 * ${inputs.uEdgeRagged}, 0.0, 1.0);
-
-                // Voronoi domain — multiplier dropped to 0.20 so cells are
-                // LARGE relative to the scene (each cell encompasses many
-                // thousands of splats). With small cells every splat picks a
-                // different center → uncorrelated jitter; with big cells,
-                // splats in the same region all pull toward the same target
-                // → coherent group migration as the field drifts.
-                float cpScale = max(${inputs.uNoiseScale} * 0.20, 0.02);
-                float cpT     = ${inputs.uTime} * ${inputs.uSpeed} * 0.22;
-                vec3  cpP     = (center - ${inputs.uHit}) * cpScale + ${inputs.uWindDir} * cpT;
-
-                // Manual 27-cell Voronoi search — track BOTH the nearest cell
-                // center (target to pull toward) AND the second-nearest
-                // distance (for the f2-f1 edge metric used as bloom inverse).
-                vec3  cpCi = floor(cpP);
-                vec3  cpCf = fract(cpP);
-                float cpD1 = 1e9;
-                float cpD2 = 1e9;
-                vec3  cpBest = vec3(0.0);
-                for (int x = -1; x <= 1; x++) {
-                  for (int y = -1; y <= 1; y++) {
-                    for (int z = -1; z <= 1; z++) {
-                      vec3 nb  = vec3(float(x), float(y), float(z));
-                      // Animate the per-cell jitter so cell centers themselves
-                      // drift — this is what makes splats "track" between cells.
-                      vec3 hh  = hash33(cpCi + nb + vec3(cpT * 0.3, cpT * 0.21, 0.0));
-                      vec3 cc  = cpCi + nb + hh;
-                      vec3 dd  = cc - cpP;
-                      float d2 = dot(dd, dd);
-                      if (d2 < cpD1) { cpD2 = cpD1; cpD1 = d2; cpBest = cc; }
-                      else if (d2 < cpD2) { cpD2 = d2; }
-                    }
-                  }
-                }
-
-                // Convert nearest cell center back to world coords:
-                //   cpBest is in voronoi-domain space; invert the domain map.
-                vec3 cpTarget = (cpBest - ${inputs.uWindDir} * cpT) / cpScale + ${inputs.uHit};
-                vec3 cpPull   = cpTarget - center;
-
-                // Time envelope: ease in/out across uDuration so the effect
-                // blooms gracefully on a one-shot trigger.
-                // Gentle ease-out: fall window widened to 50% so splats
-                // unspool from their voxel-cluster targets without snapping.
-                float cpEnv = smoothstep(0.0, 0.20, tNorm)
-                            * (1.0 - smoothstep(0.50, 1.0, tNorm));
-
-                // Pull magnitude — clamp the per-frame step so splats don't
-                // teleport on huge cells; uIntensity caps the maximum.
-                float cpPullMag = clamp(length(cpPull), 0.0, ${inputs.uIntensity} * 1.5);
-                vec3  cpPullN   = length(cpPull) > 1e-5 ? cpPull / length(cpPull) : vec3(0.0);
-                center += cpPullN * cpPullMag * 0.55 * cpMask * cpEnv;
-
-                // Tiny per-splat seeded jitter — kept very low so the mass
-                // still reads as one coherent flow rather than a noise cloud.
-                vec3 cpJit = (rand3 - 0.5) * 2.0
-                           * 0.005 * ${inputs.uIntensity} * cpMask * cpEnv;
-                center += cpJit;
-
-                // ---- Uniform bloom on all affected splats -----------------
-                // The earlier per-splat f2-f1 bloom varied independently per
-                // splat → flickery, non-cohesive look. Now the whole affected
-                // mass blooms together based on mask×envelope only.
-                scales *= mix(1.0, 1.45, cpMask * cpEnv);
-                rgba.a *= mix(1.0, 0.85, cpMask * cpEnv * 0.5);
-                // Optional colour tint scaled by the same mask×envelope —
-                // tint pulses with the active particle motion. No-op off.
-                rgba.rgb *= mix(vec3(1.0), ${inputs.uColor}, cpMask * cpEnv * 0.7);
 
               } else if (${inputs.uEffect} == 6) {
                 // ==============================================================
@@ -1228,7 +1133,6 @@ const PRESETS = {
   "Toxic Pulse":    { effect: "Wave & Tint",        color: "#9eff3a", radius: 3.0, speed: 8.0, intensity: 0.5, duration: 1.8, noiseScale: 1.2, edgeWidth: 0.15, emissive: 3.0, edgeRagged: 0.4, wispAmt: 0.4, flyMax: 2.0, windX: 0,    windY: 0,   windZ: 0 },
   "Iris Spiral":    { effect: "Spiral Smear",       color: "#ff7fc8", radius: 3.0, speed: 5.0, intensity: 1.4, duration: 3.6, noiseScale: 1.0, edgeWidth: 0.18, emissive: 2.8, edgeRagged: 0.5, wispAmt: 0.7, flyMax: 4.0, windX: 1.0,  windY: 0,   windZ: 0 },
   "Vortex Drift":   { effect: "Vortex Drift",       color: "#9dd8ff", radius: 4.0, speed: 3.5, intensity: 0.37, duration: 4.5, noiseScale: 1.0, edgeWidth: 0.18, emissive: 2.0, edgeRagged: 0.5, wispAmt: 0.6, flyMax: 6.0, windX: 0.6,  windY: 0.2, windZ: -0.4, fadeTail: 1.1 },
-  "Chaotic Particles": { effect: "Chaotic Particles", color: "#c0a8ff", radius: 3.5, speed: 4.0, intensity: 1.6, duration: 5.0, noiseScale: 1.8, edgeWidth: 0.18, emissive: 2.2, edgeRagged: 0.6, wispAmt: 0.5, flyMax: 4.0, windX: 0.3,  windY: 0.0, windZ: 0.2 },
   "Slime Molds":       { effect: "Slime Molds",       color: "#d4ff7a", radius: 0.95, speed: 3.0, intensity: 1.6, duration: 6.0, noiseScale: 2.2, edgeWidth: 0.18, emissive: 1.8, edgeRagged: 0.5, wispAmt: 0.7, flyMax: 3.0, windX: 0.4,  windY: 0.0, windZ: 0.3 },
   "Feather Roots":     { effect: "Feather Roots",     color: "#d4ff7a", radius: 5.4, speed: 5.0, intensity: 1.6, duration: 6.0, noiseScale: 1.6, edgeWidth: 0.18, emissive: 2.0, edgeRagged: 0.4, wispAmt: 0.5, flyMax: 2.0, windX: 0.0,  windY: 1.0, windZ: 0.0 },
 };
