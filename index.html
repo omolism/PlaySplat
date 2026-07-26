@@ -132,7 +132,10 @@
                  as the Scene panel's chevron-toggle. Previously +Add was a
                  text-pill and Share was an icon-square — the asymmetry read
                  as unfinished. Tooltips carry the labels for discoverability. -->
-            <button id="play-viewpoints" class="vp-header-btn" title="Tour all viewpoints as a smooth camera flight" aria-label="Play viewpoint tour">
+            <!-- Viewpoint tour delisted alongside the Playbar's Tour button.
+                 The handler stays wired via window.__playViewpointTour, so
+                 restoring the control is a matter of dropping the display. -->
+            <button id="play-viewpoints" class="vp-header-btn" title="Tour all viewpoints as a smooth camera flight" aria-label="Play viewpoint tour" style="display: none">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <polygon points="6 4 20 12 6 20 6 4" fill="currentColor" stroke="none"/>
               </svg>
