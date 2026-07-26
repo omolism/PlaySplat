@@ -75,7 +75,10 @@ export class Playbar {
       </div>
       <div class="pb-sep" aria-hidden="true"></div>
       <div class="pb-group pb-actions">
-        <button class="pb-btn pb-tour" data-act="tour" title="Play the camera tour">&#9654; Tour</button>
+        <!-- Tour is delisted from the bar but kept wired: the keyboard route
+             and window.__tourToggle still drive it. Drop the inline display to
+             restore the button. -->
+        <button class="pb-btn pb-tour" data-act="tour" title="Play the camera tour" style="display: none">&#9654; Tour</button>
         <button class="pb-btn pb-trace" data-act="trace" title="Interaction Trace — record, review and export this session">
           Trace<span class="pb-badge" data-k="traceCount" hidden>0</span>
         </button>
