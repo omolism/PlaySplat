@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Spark baseline — PlaySplat measurement harness</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { display: block; }
+  #hud {
+    position: fixed; top: 12px; left: 12px; z-index: 10;
+    font: 12px/1.5 ui-monospace, Consolas, monospace;
+    color: #dfe6df; background: rgba(12,16,12,.82);
+    border: 1px solid rgba(120,160,130,.35); border-radius: 8px;
+    padding: 10px 12px; min-width: 240px;
+  }
+  #hud h1 { margin: 0 0 6px; font-size: 12px; letter-spacing: .08em; color: #9fdcb4; }
+  #hud .row { display: flex; justify-content: space-between; gap: 16px; }
+  #hud .v { color: #fff; }
+  #hud .fps { font-size: 20px; line-height: 1.2; color: #9fdcb4; }
+  #hud button {
+    font: inherit; margin: 2px 4px 2px 0; padding: 3px 8px; cursor: pointer;
+    color: #dfe6df; background: #1b241d;
+    border: 1px solid rgba(120,160,130,.4); border-radius: 5px;
+  }
+  #hud button.on { background: #2f4a37; border-color: #7fc39a; color: #fff; }
+  #hud .note { margin-top: 8px; color: #8fa595; font-size: 11px; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <h1>SPARK BASELINE (no PlaySplat layers)</h1>
+  <div class="row"><span>fps</span><span class="v fps" id="fps">—</span></div>
+  <div class="row"><span>JS / frame</span><span class="v" id="js">—</span></div>
+  <div class="row"><span>render target</span><span class="v" id="mpx">—</span></div>
+  <div class="row"><span>drawing buffer</span><span class="v" id="buf">—</span></div>
+  <div class="row"><span>splats</span><span class="v" id="n">loading…</span></div>
+  <div style="margin-top:8px">
+    <button data-mpx="2.0">2.0 MPx</button>
+    <button data-mpx="6.0">6.0 MPx</button>
+    <button data-mpx="10.6">10.6 MPx</button>
+    <button data-mpx="24">24 MPx</button>
+  </div>
+  <div class="note">
+    Bare Spark rasterization only: no derived layers, no effects, no post-FX,
+    no hand tracking. Same Spark uniforms and same rAF-delta profiler as the
+    full system, so the difference against Table 1 is the framework overhead.
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
+
+// Scene under test. The paper's measurements use the public third-party
+// train capture, so the baseline loads the same asset.
+const SPLAT_URL = "/train.splat";
+
+const canvas = document.createElement("canvas");
+document.body.appendChild(canvas);
+
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: false,
+  powerPreference: "high-performance",
+});
+renderer.setSize(window.innerWidth, window.innerHeight, false);
+
+const scene = new THREE.Scene();
+
+// Identical Spark configuration to the full system (src/main.js): these are
+// renderer-level uniforms and materially affect fill rate, so the baseline
+// must match them or the comparison is meaningless.
+const spark = new SparkRenderer({
+  renderer,
+  preBlurAmount:   0.3,
+  focalAdjustment: 2.0,
+});
+scene.add(spark);
+
+const camera = new THREE.PerspectiveCamera(
+  55, window.innerWidth / window.innerHeight, 0.01, 2000,
+);
+camera.position.set(0, 1.5, 4);
+scene.add(camera);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+// --- resolution sweep -----------------------------------------------------
+// The paper scales render resolution through a devicePixelRatio override at a
+// constant viewport, so the same override is used here. The DPR needed for a
+// target megapixel count depends on the viewport, so it is derived rather than
+// hard-coded, and the achieved MPx is reported for the record.
+let targetMPx = 2.0;
+function applyResolution() {
+  const w = window.innerWidth, h = window.innerHeight;
+  const dpr = Math.sqrt((targetMPx * 1e6) / (w * h));
+  renderer.setPixelRatio(dpr);
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  const b = new THREE.Vector2();
+  renderer.getDrawingBufferSize(b);
+  hud.buf.textContent = `${b.x} x ${b.y}`;
+  hud.mpx.textContent = `${((b.x * b.y) / 1e6).toFixed(2)} MPx (dpr ${dpr.toFixed(2)})`;
+}
+
+const hud = {
+  fps: document.getElementById("fps"),
+  js:  document.getElementById("js"),
+  mpx: document.getElementById("mpx"),
+  buf: document.getElementById("buf"),
+  n:   document.getElementById("n"),
+};
+
+document.querySelectorAll("#hud button").forEach((b) => {
+  b.addEventListener("click", () => {
+    targetMPx = parseFloat(b.dataset.mpx);
+    document.querySelectorAll("#hud button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    applyResolution();
+    reset();
+  });
+});
+window.addEventListener("resize", applyResolution);
+
+// --- profiler -------------------------------------------------------------
+// Frame-to-frame rAF delta over a 30-sample rolling window, matching
+// src/profiler.js. Frame rate is the real presentation cadence including GPU
+// back-pressure, not a JS wall-clock estimate.
+const WINDOW = 30;
+let deltas = [], jsTimes = [], lastFrameT = 0;
+function reset() { deltas = []; jsTimes = []; lastFrameT = 0; }
+function push(arr, v) { arr.push(v); if (arr.length > WINDOW) arr.shift(); }
+const avg = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0;
+
+let hudT = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (lastFrameT > 0) push(deltas, now - lastFrameT);
+  lastFrameT = now;
+
+  const t0 = performance.now();
+  controls.update();
+  renderer.render(scene, camera);
+  push(jsTimes, performance.now() - t0);
+
+  if (now - hudT > 250) {
+    hudT = now;
+    const d = avg(deltas);
+    hud.fps.textContent = d > 0 ? (1000 / d).toFixed(1) : "—";
+    hud.js.textContent  = `${avg(jsTimes).toFixed(2)} ms`;
+  }
+}
+
+// --- load and run ---------------------------------------------------------
+(async () => {
+  const bytes = new Uint8Array(await (await fetch(SPLAT_URL)).arrayBuffer());
+  const mesh = new SplatMesh({ fileBytes: bytes, fileType: "splat" });
+  // Capture convention: the same 180-degree X flip the full system applies.
+  mesh.rotation.x = Math.PI;
+  scene.add(mesh);
+  await (mesh.initialized ?? Promise.resolve());
+  hud.n.textContent = (mesh.numSplats ?? mesh.packedSplats?.numSplats ?? "ready").toLocaleString?.() ?? "ready";
+  applyResolution();
+  document.querySelector('#hud button[data-mpx="2.0"]').classList.add("on");
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
