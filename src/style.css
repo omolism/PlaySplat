@@ -2703,6 +2703,10 @@ body.tech-spec-open #scene-panel {
    only Replay â€” the more frequently-wanted action. Reset is still
    reachable via the GUI controls if a phone user really needs it. */
 body.phone .gui-reset-btn:not(.gui-replay-btn) { display: none !important; }
+/* These three declarations were orphaned: their selector's opening had
+   been lost, so they sat outside any rule and every build dropped them
+   with a CSS syntax error. Reattached to the title they describe. */
+.lil-gui.root > .title {
   /* Tighter vertical padding when the whole panel is collapsed â€”
      keeps the chevron centered visually in the pill (see .closed rules
      below). Smooth so the height collapse feels of-a-piece. */
