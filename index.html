@@ -11,9 +11,16 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <meta name="theme-color" content="#000000" />
 
-    <!-- Analytics intentionally absent — PlaySplat is a local-first
-         playground; the upstream SplatGarden GA property must not
-         receive traffic from this fork. -->
+    <!-- Google Analytics. Loaded async so it never blocks first paint, and
+         deliberately left out of the service worker's cache patterns so a
+         cached shell does not replay stale measurement hits. -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-58XJCV52X0"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-58XJCV52X0');
+    </script>
   </head>
   <body>
     <div id="app">
