@@ -35,11 +35,13 @@ jobs:
         run: npm ci
 
       - name: Build
-        # The project page lives at /PlaySplat/, and every public asset in the
-        # app resolves against import.meta.env.BASE_URL, so this single value
-        # is all that has to change to move the deployment.
+        # The site is published on the custom apex domain playsplats.com, which
+        # serves from the root, so the base is "/" and not the repository slug.
+        # Every public asset resolves against import.meta.env.BASE_URL, so this
+        # single value is all that changes if the deployment ever moves back to
+        # a github.io project path.
         env:
-          VITE_BASE: /PlaySplat/
+          VITE_BASE: /
         run: npm run build
 
       - name: Disable Jekyll
