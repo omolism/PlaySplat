@@ -652,8 +652,9 @@ export class MobileUI {
       </div>
       <button class="ms-action" data-act="pipeline" style="display: none">Open Tech Breakdown</button>
       <button class="ms-action" data-act="guide">Open Quick Guide</button>
-      <!-- pipeline + credits TEMPORARILY DELISTED (drop the inline display to restore) -->
-      <button class="ms-action" data-act="credits" style="display: none">Credits</button>
+      <!-- pipeline stays delisted until its breakdown content is rewritten
+           (drop the inline display above to restore it) -->
+      <button class="ms-action" data-act="credits">Credits</button>
     `;
     // Pipeline = the tech-spec asset drawer. Moved here from the (now-
     // empty) hamburger so users on touch still have a way in. Closes

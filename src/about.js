@@ -109,11 +109,12 @@ export class About {
            may not show everything at once, but the two action buttons
            stay visible without scrolling — they're the only path
            forward from this surface. -->
-      <!-- TEMPORARILY DELISTED: Tech Spec and Credits are hidden while
-           their PlaySplat-specific content is rewritten. Remove the
-           hidden attribute to restore both CTAs. -->
-      <section class="ab-cta-sec" style="display: none">
-        <button class="ab-cta" data-act="open-tech-spec" type="button">
+      <!-- Credits is live. Tech Spec stays delisted until its
+           PlaySplat-specific breakdown content is rewritten (its current
+           copy still describes the authored garden scene) — drop the
+           inline display on that one button to restore it. -->
+      <section class="ab-cta-sec">
+        <button class="ab-cta" data-act="open-tech-spec" type="button" style="display: none">
           <span class="ab-cta-label">Read the full Tech Spec</span>
           <span class="ab-cta-arrow" aria-hidden="true">→</span>
         </button>

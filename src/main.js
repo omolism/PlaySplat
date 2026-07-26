@@ -2037,9 +2037,11 @@ async function loadSplat() {
       creditsCtrl.updateDisplay();
     }
   };
-  // TEMPORARILY DELISTED — the Tech Spec drawer (and its Credits entry)
-  // are hidden while the PlaySplat-specific breakdown content is being
-  // rewritten. Remove this hide() to restore the folder.
+  // The Tech Spec folder stays hidden: its asset hotspots and breakdown
+  // copy still describe the authored garden scene. Credits itself is live
+  // again and reachable from the About panel CTA and the mobile sheet, so
+  // nothing here gates it. Remove this hide() once the folder's contents
+  // are rewritten for PlaySplat.
   fTechSpec.hide();
 
   // Replay Intro — clears the first-visit flag and reloads so the camera
