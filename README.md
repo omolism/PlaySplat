@@ -26,7 +26,7 @@ cross-fade freely in one WebGL 2 context:
   SPZ-compressed variant at roughly half the desktop payload
 - **Hand interaction**: in-browser MediaPipe hand tracking (One-Euro filtered
   pinch with hysteresis) and mouse raycasts normalized into one spatial
-  interface driving eight per-splat shader effects
+  interface driving seven per-splat shader effects
 - **Drag-and-drop**: load your own `.splat` / `.ply` / `.spz` / `.ksplat`
   scenes and read them through the same three representations
 - **Post-FX chain**: bloom, kaleidoscope, lens warp, underwater, painterly

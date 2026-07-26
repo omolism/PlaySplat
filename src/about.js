@@ -24,7 +24,7 @@ const PILLARS = [
   },
   {
     tag: "Interact",
-    line: "Every click runs a real-time simulation · MediaPipe hand tracking · 8 per-splat FX",
+    line: "Every click runs a real-time simulation · MediaPipe hand tracking · 7 per-splat FX",
   },
   {
     tag: "Customize",

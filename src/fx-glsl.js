@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Shared FX GLSL — plain-GLSL equivalent of the splat dyno modifier, used by
 // Voxelizer and Quadizer vertex shaders so cubes / billboards animate
-// alongside the splat layer for ALL 8 effects.
+// alongside the splat layer for ALL 7 effects.
 //
 // API (preferred — one evaluation per vertex):
 //   include FX_UNIFORMS in the shader's uniform declarations

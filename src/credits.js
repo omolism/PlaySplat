@@ -46,21 +46,22 @@ const SOFTWARE_OTHER    = [
 ];
 const SOFTWARE_ALSO     = ["SpeedTree"];
 
-// Tech Stack — the research / runtime / interop methods that ride
-// underneath the visible scene. HP AI Studio and OpenUSD are the
-// featured story beats.
-const TECH_FEATURED = ["HP AI Studio", "OpenUSD"];
+// Tech Stack — ordered by what PlaySplat actually is. The previous ranking
+// led with the offline authoring stack, which belongs to the scene rather
+// than to this viewer: PlaySplat is a browser runtime, so the rasterizer it
+// builds on, the framework it lives in, and the interchange format it writes
+// are the featured beats. The scene's production stack is still credited,
+// below the runtime it feeds.
+const TECH_FEATURED = ["@sparkjsdev/spark", "Three.js", "OpenUSD"];
 const TECH_OTHER    = [
-  // Reconstruction
-  "COLMAP",
-  // AI stylization
-  "PyTorch", "CUDA", "IP-Adapter", "ControlNet", "AdaIN",
-  // Render runtime
-  "@sparkjsdev/spark", "Three.js", "WebGL 2", "Vite",
+  // Browser runtime
+  "WebGL 2", "Vite",
   // Interaction
   "MediaPipe HandLandmarker",
-  // USD primitives
+  // Interchange primitives
   "UsdGeomPointInstancer",
+  // Scene production — reconstruction and AI stylization
+  "COLMAP", "HP AI Studio", "PyTorch", "CUDA", "IP-Adapter", "ControlNet", "AdaIN",
 ];
 
 const LINK_ICON_SVG = `
@@ -88,10 +89,10 @@ export class Credits {
              the page previously had no project-level "what am I looking
              at" anywhere — only per-asset detail in the Tech Spec. -->
         <section class="cr-sec cr-about">
-          <div class="cr-about-eyebrow">A 3D Gaussian Splatting showcase</div>
+          <div class="cr-about-eyebrow">A playable 3D Gaussian Splatting experience</div>
           <h2 class="cr-about-title">PlaySplat</h2>
-          <div class="cr-about-sub">Studio Showcase</div>
-          <div class="cr-about-stack">Houdini &middot; Unreal &middot; COLMAP &middot; Spark</div>
+          <div class="cr-about-sub">A browser spin-off of SplatGarden, built for play</div>
+          <div class="cr-about-stack">Three.js &middot; Spark &middot; OpenUSD &middot; MediaPipe</div>
         </section>
         <section class="cr-sec">
           <div class="cr-sec-title">Team</div>
