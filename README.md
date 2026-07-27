@@ -16,7 +16,7 @@ The system is described in a peer-reviewed short paper at **Web3D 2026**, the
 31st International Conference on 3D Web Technology (Doha, October 2026),
 published open access under CC-BY.
 
-> Danci Shen and Itim Kongsakulvatanasook. 2026. From Viewing to Playing:
+> Danci Shen. 2026. From Viewing to Playing:
 > Bring-Your-Own-Scene Interaction for 3D Gaussian Splatting on the Web. In
 > *The 31th International Conference on 3D Web Technology (Web3D '26)*. ACM.
 > https://doi.org/10.1145/3822516.3834873
@@ -26,7 +26,7 @@ published open access under CC-BY.
 
 ```bibtex
 @inproceedings{shen2026playsplat,
-  author    = {Shen, Danci and Kongsakulvatanasook, Itim},
+  author    = {Shen, Danci},
   title     = {From Viewing to Playing: Bring-Your-Own-Scene Interaction for
                3D Gaussian Splatting on the Web},
   booktitle = {The 31th International Conference on 3D Web Technology (Web3D '26)},

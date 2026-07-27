@@ -10,6 +10,9 @@ abstract: >-
   representations deform together in shared object space, and the derived layers
   export to validated OpenUSD from the browser.
 type: software
+# Software contributors. The paper below carries a single author because ACM
+# does not permit adding authors after acceptance, but the codebase credit is
+# separate and reflects who worked on it.
 authors:
   - family-names: Shen
     given-names: Danci
@@ -38,9 +41,6 @@ preferred-citation:
     - family-names: Shen
       given-names: Danci
       orcid: "https://orcid.org/0009-0006-6646-5531"
-    - family-names: Kongsakulvatanasook
-      given-names: Itim
-      orcid: "https://orcid.org/0009-0006-9374-7729"
   # Proceedings title as ACM registered it, kept verbatim so the citation
   # matches the DOI record.
   collection-title: >-
