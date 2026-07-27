@@ -92,5 +92,10 @@ usdchecker layer.usdc
 
 ## License
 
-See individual dependency licenses. Scene assets are provided for
-demonstration purposes.
+The source code is released under the [MIT License](LICENSE).
+
+This does not extend to the scene assets in `public/`, which are artwork rather
+than code. They ship with the repository so the viewer runs out of the box and
+are provided for demonstration only; all rights to them are reserved. Any
+capture you load yourself remains entirely yours, and nothing you drop into the
+page leaves your browser.
