@@ -41,10 +41,9 @@ The DOI resolves once the proceedings are published. GitHub also reads
 `CITATION.cff`, so the *Cite this repository* button on the sidebar produces the
 same reference in APA or BibTeX.
 
-Figures in the paper deliberately use the public
-[antimatter15 train capture](https://github.com/antimatter15/splat) rather than
-the SplatGarden scene, so the results read against a neutral, widely used
-benchmark.
+Figures and measurements in the paper use the public
+[antimatter15 train capture](https://github.com/antimatter15/splat), so the
+results read against a neutral, widely used benchmark.
 
 A single 3DGS asset is maintained as three co-registered representations that
 cross-fade freely in one WebGL 2 context:
