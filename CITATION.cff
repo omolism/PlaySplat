@@ -1,0 +1,60 @@
+cff-version: 1.2.0
+message: >-
+  If you use PlaySplat in your work, please cite the Web3D 2026 paper below
+  rather than the repository itself.
+title: PlaySplat
+abstract: >-
+  A browser-based system that turns a 3D Gaussian Splatting scene from something
+  you view into something you play. Pointer and hand tracking share one gesture
+  grammar, any capture can be dropped into the page, three co-registered
+  representations deform together in shared object space, and the derived layers
+  export to validated OpenUSD from the browser.
+type: software
+authors:
+  - family-names: Shen
+    given-names: Danci
+    orcid: "https://orcid.org/0009-0006-6646-5531"
+    affiliation: Savannah College of Art and Design
+  - family-names: Kongsakulvatanasook
+    given-names: Itim
+    orcid: "https://orcid.org/0009-0006-9374-7729"
+    affiliation: Savannah College of Art and Design
+repository-code: "https://github.com/omolism/PlaySplat"
+url: "https://playsplats.com"
+keywords:
+  - 3D Gaussian Splatting
+  - WebGL
+  - OpenUSD
+  - hand tracking
+  - playable experience
+
+preferred-citation:
+  type: conference-paper
+  title: >-
+    From Viewing to Playing: Bring-Your-Own-Scene Interaction for 3D Gaussian
+    Splatting on the Web
+  authors:
+    - family-names: Shen
+      given-names: Danci
+      orcid: "https://orcid.org/0009-0006-6646-5531"
+    - family-names: Kongsakulvatanasook
+      given-names: Itim
+      orcid: "https://orcid.org/0009-0006-9374-7729"
+  # Proceedings title as ACM registered it, kept verbatim so the citation
+  # matches the DOI record.
+  collection-title: >-
+    The 31th International Conference on 3D Web Technology (Web3D '26)
+  conference:
+    name: The 31th International Conference on 3D Web Technology
+    city: Doha
+    country: QA
+    date-start: "2026-10-13"
+    date-end: "2026-10-15"
+  publisher:
+    name: Association for Computing Machinery
+    city: New York
+    country: US
+  year: 2026
+  month: 10
+  doi: 10.1145/3822516.3834873
+  url: "https://doi.org/10.1145/3822516.3834873"

@@ -3,10 +3,48 @@
 A browser-based multi-representation viewer for 3D Gaussian Splatting scenes,
 built on Three.js and [@sparkjsdev/spark](https://github.com/sparkjsdev/spark).
 
+Live at **[playsplats.com](https://playsplats.com)**.
+
 PlaySplat is a spin-off of [SplatGarden](https://splatgarden.com). Where
 SplatGarden presents the finished artwork, PlaySplat focuses on interaction
 and customization: every parameter exposed, drag-and-drop scene loading,
 and OpenUSD export for research and tinkering.
+
+## Paper
+
+The system is described in a peer-reviewed short paper at **Web3D 2026**, the
+31st International Conference on 3D Web Technology (Doha, October 2026),
+published open access under CC-BY.
+
+> Danci Shen and Itim Kongsakulvatanasook. 2026. From Viewing to Playing:
+> Bring-Your-Own-Scene Interaction for 3D Gaussian Splatting on the Web. In
+> *The 31th International Conference on 3D Web Technology (Web3D '26)*. ACM.
+> https://doi.org/10.1145/3822516.3834873
+
+<details>
+<summary>BibTeX</summary>
+
+```bibtex
+@inproceedings{shen2026playsplat,
+  author    = {Shen, Danci and Kongsakulvatanasook, Itim},
+  title     = {From Viewing to Playing: Bring-Your-Own-Scene Interaction for
+               3D Gaussian Splatting on the Web},
+  booktitle = {The 31th International Conference on 3D Web Technology (Web3D '26)},
+  year      = {2026},
+  publisher = {Association for Computing Machinery},
+  doi       = {10.1145/3822516.3834873}
+}
+```
+</details>
+
+The DOI resolves once the proceedings are published. GitHub also reads
+`CITATION.cff`, so the *Cite this repository* button on the sidebar produces the
+same reference in APA or BibTeX.
+
+Figures in the paper deliberately use the public
+[antimatter15 train capture](https://github.com/antimatter15/splat) rather than
+the SplatGarden scene, so the results read against a neutral, widely used
+benchmark.
 
 A single 3DGS asset is maintained as three co-registered representations that
 cross-fade freely in one WebGL 2 context:
@@ -14,7 +52,7 @@ cross-fade freely in one WebGL 2 context:
 - **Splat**: anisotropic Gaussians (source of truth), with a Gaussian/Point
   sub-form morph
 - **Billboard**: camera-facing planes mirroring the OpenUSD
-  `UsdGeomPointInstancer` data model (quad / antialiased disc prototypes)
+  `UsdGeomPointInstancer` data model (quad / antialiased circle prototypes)
 - **Voxel**: uniform-grid clustering over cube / sphere prototypes
 
 ## Features
